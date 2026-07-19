@@ -72,3 +72,23 @@ which emails are registered (user enumeration).
 itself (a line meant for service.py got pasted into the wrong file). Worth
 double-checking which file an edit is meant to land in when juggling several
 similarly-structured files.
+
+### Day 9 — Refresh Tokens + Protected Routes
+Built create_refresh_token() (7-day expiry) and get_current_user() as a reusable
+FastAPI dependency — decodes the JWT from the Authorization header via
+OAuth2PasswordBearer, validates signature/expiry/type, fetches the user from
+the DB. Every future protected route just adds Depends(get_current_user)
+instead of reimplementing auth logic.
+
+Both access and refresh tokens carry a "type" claim (access/refresh) — without
+it, a leaked refresh token could be used directly on protected routes instead
+of being restricted to /auth/refresh.
+
+POST /auth/refresh reuses the same refresh token rather than rotating it
+(stateless design) — simpler, but means a stolen refresh token can't be
+revoked before it expires. Flagged as a Week 8 stretch goal once refresh
+tokens are stored server-side.
+
+Key lesson: hit the same missing-import pattern twice today (RefreshRequest,
+then create_refresh_token) — worth building the habit of adding an import
+the moment a new name is used, not after hitting a NameError.
