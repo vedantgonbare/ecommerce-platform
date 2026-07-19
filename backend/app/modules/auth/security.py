@@ -16,6 +16,14 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 15  # short-lived, deliberately
 
 def create_access_token(user_id: str) -> str:
     expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    payload = {"sub": user_id, "exp": expire}
+    payload = {"sub": user_id, "exp": expire, "type": "access"}
+    token = jwt.encode(payload, settings.jwt_secret_key, algorithm=ALGORITHM)
+    return token
+
+REFRESH_TOKEN_EXPIRE_DAYS = 7
+
+def create_refresh_token(user_id: str) -> str:
+    expire = datetime.now(timezone.utc) + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+    payload = {"sub": user_id, "exp": expire, "type": "refresh"}
     token = jwt.encode(payload, settings.jwt_secret_key, algorithm=ALGORITHM)
     return token
