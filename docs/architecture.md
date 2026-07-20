@@ -92,3 +92,26 @@ tokens are stored server-side.
 Key lesson: hit the same missing-import pattern twice today (RefreshRequest,
 then create_refresh_token) — worth building the habit of adding an import
 the moment a new name is used, not after hitting a NameError.
+
+### Day 10 — Testing + Week 2 Recap
+
+**Testing setup:** Chose a separate test database (`ecommerce_test`) over
+reusing the dev DB — avoids polluting real data and lets tests run repeatedly
+without duplicate-email conflicts. `conftest.py` handles the whole lifecycle:
+[explain in your own words — env var override before app import, session-scoped
+table create/drop fixture, async test client via httpx + ASGITransport,
+get_db dependency override].
+
+**Event loop gotcha:** Hit an asyncpg InterfaceError because pytest-asyncio
+was creating a new event loop per test, but the DB engine was tied to the
+loop from the session-scoped fixture. Fixed via pytest.ini setting
+asyncio_default_fixture_loop_scope = session — [explain why in your own words].
+
+**First automated tests written:** test_register_success, 
+test_register_duplicate_email, test_login_success — covering the two main
+happy/failure paths in the auth flow for the first time with actual test
+code instead of manual Postman checks.
+
+**Week 2 recap (bcrypt + JWT):** [your reasoning on bcrypt's tunable slowness,
+access vs refresh token tradeoffs, and the stateless-refresh-token limitation
+we've flagged as a Week 8 stretch goal]
