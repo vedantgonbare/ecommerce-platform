@@ -3,6 +3,7 @@ from app.core.config import settings
 from app.db.session import engine
 from sqlalchemy import text
 from app.modules.auth.router import router as auth_router
+from app.modules.categories.router import router as categories_router
 
 
 app = FastAPI(title="E-Commerce Platform")
@@ -17,4 +18,4 @@ async def db_check():
         result = await conn.execute(text("SELECT 1"))
         return{"db_connected": result.scalar() == 1}
     
-app.include_router(auth_router)
+app.include_router(categories_router)

@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 from sqlalchemy import pool
 from alembic import context
 from app.modules.users.models import User
-
+from app.modules.categories.models import Category
 from app.core.config import settings
 from app.db.base import Base
 # import your models here once they exist, so Base.metadata knows about them
