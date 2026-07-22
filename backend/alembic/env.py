@@ -5,6 +5,7 @@ from sqlalchemy import pool
 from alembic import context
 from app.modules.users.models import User
 from app.modules.categories.models import Category
+from app.modules.products.models import Product
 from app.core.config import settings
 from app.db.base import Base
 # import your models here once they exist, so Base.metadata knows about them

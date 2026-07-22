@@ -4,7 +4,7 @@ from app.db.session import engine
 from sqlalchemy import text
 from app.modules.auth.router import router as auth_router
 from app.modules.categories.router import router as categories_router
-
+from app.modules.products.router import router as products_router
 
 app = FastAPI(title="E-Commerce Platform")
 
@@ -19,3 +19,5 @@ async def db_check():
         return{"db_connected": result.scalar() == 1}
     
 app.include_router(categories_router)
+
+app.include_router(products_router)
