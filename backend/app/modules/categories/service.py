@@ -5,6 +5,7 @@ from sqlalchemy.exc import IntegrityError
 from app.modules.categories.schemas import CategoryCreate
 from sqlalchemy import select
 import uuid
+from app.modules.categories.schemas import CategoryCreate, CategoryUpdate
 
 def slugify(name: str) -> str:
     slug = name.lower().strip()
@@ -42,3 +43,30 @@ async def get_all_categories(db: AsyncSession) -> list[Category]:
 async def get_category_by_id(db: AsyncSession, category_id: uuid.UUID) -> Category | None:
     result = await db.execute(select(Category).where(Category.id == category_id))
     return result.scalar_one_or_none()
+
+async def update_category(db: AsyncSession, category: Category, update_data: CategoryUpdate) -> Category:
+    if update_data.name is not None:
+        category.name = update_data.name
+        category.slug = slugify(update_data.name)
+    if update_data.parent_id is not None:
+        category.parent_id = update_data.parent_id
+
+    try:
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        raise SlugAlreadyExistsError()
+
+    await db.refresh(category)
+    return category
+
+class CategoryHasChildrenError(Exception):
+    pass
+
+async def delete_category(db: AsyncSession, category: Category) -> None:
+    result = await db.execute(select(Category).where(Category.parent_id == category.id))
+    if result.scalar_one_or_none() is not None:
+        raise CategoryHasChildrenError()
+
+    await db.delete(category)
+    await db.commit()

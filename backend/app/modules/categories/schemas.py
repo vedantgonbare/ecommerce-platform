@@ -15,3 +15,8 @@ class CategoryResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class CategoryUpdate(BaseModel):
+    name: str | None = None
+    parent_id: uuid.UUID | None = None
