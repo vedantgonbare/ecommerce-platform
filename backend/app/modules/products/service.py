@@ -1,12 +1,15 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.modules.products.models import Product
-from app.modules.products.schemas import ProductCreate
+from app.modules.products.schemas import ProductCreate, ProductUpdate
 from app.modules.categories.models import Category
 import uuid
 
 class CategoryNotFoundError(Exception):
     pass
+
+class ProductNotFoundError(Exception):
+    pass    
 
 async def create_product(db: AsyncSession, product_data: ProductCreate) -> Product:
     result = await db.execute(select(Category).where(Category.id == product_data.category_id))
@@ -32,9 +35,12 @@ async def get_all_products(db: AsyncSession) -> list[Product]:
     return result.scalars().all()
 
 
-async def get_product_by_id(db: AsyncSession, product_id: uuid.UUID) -> Product | None:
+async def get_product_or_404(db: AsyncSession, product_id: uuid.UUID) -> Product:
     result = await db.execute(select(Product).where(Product.id == product_id))
-    return result.scalar_one_or_none()
+    product = result.scalar_one_or_none()
+    if product is None:
+        raise ProductNotFoundError()
+    return product
 
 async def update_product(db, product_id, update_data: ProductUpdate):
     product = await get_product_or_404(db, product_id)  # reuse your existing fetch helper
