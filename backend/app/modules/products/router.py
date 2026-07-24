@@ -10,12 +10,13 @@ from app.modules.products.service import (
     ProductNotFoundError,
     update_product,
     delete_product,
+    search_products,
 )
 import uuid
 
 router = APIRouter(prefix="/products", tags=["products"])
 
-@router.post("/", response_model=ProductResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/", response_model=ProductResponse, status_code=status.HTTP_201_CREATED)        #create
 async def create(product_data: ProductCreate, db: AsyncSession = Depends(get_db)):
     try:
         new_product = await create_product(db, product_data)
@@ -23,11 +24,18 @@ async def create(product_data: ProductCreate, db: AsyncSession = Depends(get_db)
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Category does not exist")
     return new_product
 
-@router.get("/", response_model=list[ProductResponse])
+
+@router.get("/", response_model=list[ProductResponse])                                          # list_products
 async def list_products(db: AsyncSession = Depends(get_db)):
     return await get_all_products(db)
 
-@router.get("/{product_id}", response_model=ProductResponse)
+
+@router.get("/search", response_model=list[ProductResponse])                                        #searching                
+async def search(q: str, db: AsyncSession = Depends(get_db)):
+    return await search_products(db, q)
+
+
+@router.get("/{product_id}", response_model=ProductResponse)                                   #get router
 async def get_product(product_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
     try:
         product = await get_product_or_404(db, product_id)

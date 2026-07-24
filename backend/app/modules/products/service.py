@@ -4,6 +4,7 @@ from app.modules.products.models import Product
 from app.modules.products.schemas import ProductCreate, ProductUpdate
 from app.modules.categories.models import Category
 import uuid
+from sqlalchemy import select, func
 
 class CategoryNotFoundError(Exception):
     pass
@@ -63,3 +64,15 @@ async def delete_product(db, product_id):
     product = await get_product_or_404(db, product_id)
     await db.delete(product)
     await db.commit()
+
+
+async def search_products(db: AsyncSession, query: str) -> list[Product]:
+    ts_query = func.plainto_tsquery("english", query)
+    ts_vector = func.to_tsvector("english", Product.name)
+
+    result = await db.execute(
+        select(Product)
+        .where(ts_vector.op("@@")(ts_query))
+        .order_by(func.ts_rank(ts_vector, ts_query).desc())
+    )
+    return result.scalars().all()

@@ -5,6 +5,8 @@ services:
     build: ./backend
     ports:
       - "8000:8000"
+    volumes:
+      - ./backend:/app
     environment:
       - DATABASE_URL=postgresql+asyncpg://postgres:postgres18@db:5432/ecommerce_db
     env_file:
