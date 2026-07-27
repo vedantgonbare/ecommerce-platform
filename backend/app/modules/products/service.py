@@ -30,10 +30,27 @@ async def create_product(db: AsyncSession, product_data: ProductCreate) -> Produ
     await db.refresh(new_product)
     return new_product
 
+async def get_all_products(
+    db: AsyncSession,
+    limit: int = 20,
+    offset: int = 0,
+    category_id: uuid.UUID | None = None,
+) -> tuple[int, list[Product]]:
+    base_query = select(Product)
+    if category_id is not None:
+        base_query = base_query.where(Product.category_id == category_id)
 
-async def get_all_products(db: AsyncSession) -> list[Product]:
-    result = await db.execute(select(Product))
-    return result.scalars().all()
+    count_query = select(func.count()).select_from(base_query.subquery())
+    total = (await db.execute(count_query)).scalar_one()
+
+    result = await db.execute(base_query.limit(limit).offset(offset))
+    items = result.scalars().all()
+
+    return total, items
+
+# async def get_all_products(db: AsyncSession) -> list[Product]:
+#     result = await db.execute(select(Product))
+#     return result.scalars().all()
 
 
 async def get_product_or_404(db: AsyncSession, product_id: uuid.UUID) -> Product:

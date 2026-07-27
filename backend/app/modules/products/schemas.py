@@ -22,10 +22,15 @@ class ProductResponse(BaseModel):
     class Config:
         from_attributes = True
 
-
 class ProductUpdate(BaseModel):
     name: str | None = None
     description: str | None = None
     price: Decimal | None = None
     stock_quantity: int | None = None
     category_id: uuid.UUID | None = None
+
+class ProductListResponse(BaseModel):
+    total: int
+    limit: int
+    offset: int
+    items: list[ProductResponse]

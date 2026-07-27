@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.session import get_db
-from app.modules.products.schemas import ProductCreate, ProductResponse, ProductUpdate
+from app.modules.products.schemas import ProductCreate, ProductResponse, ProductUpdate, ProductListResponse
 from app.modules.products.service import (
     create_product,
     CategoryNotFoundError,
@@ -24,10 +24,19 @@ async def create(product_data: ProductCreate, db: AsyncSession = Depends(get_db)
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Category does not exist")
     return new_product
 
+@router.get("/", response_model=ProductListResponse)
+async def list_products(
+    limit: int = 20,
+    offset: int = 0,
+    category_id: uuid.UUID | None = None,
+    db: AsyncSession = Depends(get_db),
+):
+    total, items = await get_all_products(db, limit=limit, offset=offset, category_id=category_id)
+    return ProductListResponse(total=total, limit=limit, offset=offset, items=items)
 
-@router.get("/", response_model=list[ProductResponse])                                          # list_products
-async def list_products(db: AsyncSession = Depends(get_db)):
-    return await get_all_products(db)
+# @router.get("/", response_model=list[ProductResponse])                                          # list_products
+# async def list_products(db: AsyncSession = Depends(get_db)):
+#     return await get_all_products(db)
 
 
 @router.get("/search", response_model=list[ProductResponse])                                        #searching                
