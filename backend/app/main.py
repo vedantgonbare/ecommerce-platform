@@ -18,6 +18,6 @@ async def db_check():
         result = await conn.execute(text("SELECT 1"))
         return{"db_connected": result.scalar() == 1}
     
+app.include_router(auth_router)
 app.include_router(categories_router)
-
 app.include_router(products_router)
