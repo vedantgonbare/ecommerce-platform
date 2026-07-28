@@ -6,10 +6,9 @@ from alembic import context
 from app.modules.users.models import User
 from app.modules.categories.models import Category
 from app.modules.products.models import Product
+from app.modules.cart.models import Cart, CartItem
 from app.core.config import settings
 from app.db.base import Base
-# import your models here once they exist, so Base.metadata knows about them
-# from app.modules.users.models import User
 
 config = context.config
 config.set_main_option("sqlalchemy.url", settings.database_url)
