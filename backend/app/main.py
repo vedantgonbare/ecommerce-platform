@@ -5,6 +5,7 @@ from sqlalchemy import text
 from app.modules.auth.router import router as auth_router
 from app.modules.categories.router import router as categories_router
 from app.modules.products.router import router as products_router
+from app.modules.cart.router import router as cart_router
 
 app = FastAPI(title="E-Commerce Platform")
 
@@ -21,3 +22,4 @@ async def db_check():
 app.include_router(auth_router)
 app.include_router(categories_router)
 app.include_router(products_router)
+app.include_router(cart_router)
