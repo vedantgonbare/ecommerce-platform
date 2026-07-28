@@ -115,3 +115,87 @@ code instead of manual Postman checks.
 **Week 2 recap (bcrypt + JWT):** [your reasoning on bcrypt's tunable slowness,
 access vs refresh token tradeoffs, and the stateless-refresh-token limitation
 we've flagged as a Week 8 stretch goal]
+
+---
+
+## Week 3 — Product Catalog
+
+### Day 11 — Category Model
+Built a self-referencing Category model (nullable parent_id) to support
+hierarchical categories (e.g. Electronics > Laptops) without a separate
+join table — a single FK pointing back to the same table. Slugs are
+auto-generated from the name at creation time and enforced unique at the
+DB level, since URLs and lookups should use human-readable identifiers
+rather than raw UUIDs.
+
+Known deferred gap: no cycle-detection on parent_id (a category could in
+theory be set as its own ancestor). Acceptable for now since categories are
+admin-created, not user-generated, but flagged as a real gap if this were
+production-facing.
+
+### Day 12–13 — Product CRUD
+Product's category_id is a required FK, not nullable — every product must
+belong to a category, there's no "uncategorized" state to handle downstream.
+price uses Numeric(10,2) / Decimal rather than float — floats introduce
+rounding errors in monetary values (0.1 + 0.2 != 0.3 territory), which is
+unacceptable once real money is involved. Deliberately left out a SKU field
+for now — not every catalog needs one, and adding it later is a straightforward
+migration versus overengineering a field with no current use.
+
+Full CRUD follows the same router/service split as auth: routers translate
+service-layer exceptions (CategoryNotFoundError, ProductNotFoundError) into
+HTTP status codes, services hold the actual logic.
+
+### Day 14 — Full-Text Search
+Built GET /products/search using Postgres's to_tsvector/plainto_tsquery rather
+than a plain ILIKE '%query%'. The win over ILIKE is language-awareness —
+stemming (e.g. "running" matches "run") and stopword handling — plus ts_rank
+for relevance ordering, not raw speed.
+
+Two deliberate scope calls, both documented tradeoffs rather than oversights:
+- Search scope is name-only, not name + description. Simpler, and matches the
+  most common real-world search intent for a catalog this size.
+- The tsvector is computed on-the-fly per query, not stored as a generated
+  column with a GIN index. This means no index-backed speed advantage over
+  ILIKE at scale — for a learning project's data volume this is a non-issue,
+  but at real scale this is the first thing I'd revisit (stored tsvector
+  column + GIN index removes the per-query computation cost entirely).
+
+Route ordering lesson (re-learned, first hit back in an earlier week too):
+/search must be registered before /{product_id} in router.py — FastAPI
+matches routes in registration order, so a dynamic path registered first
+will try to parse the literal string "search" as a UUID and 422 instead of
+ever reaching the search handler.
+
+### Day 15 — Pagination, Filtering, pytest Suite
+
+**Pagination + filtering:** GET /products/ now accepts limit/offset and an
+optional category_id filter, wrapped in a ProductListResponse
+({total, limit, offset, items}). The count and the paginated results are
+built from the same base query (count via
+select(func.count()).select_from(base_query.subquery())) rather than two
+independently-constructed queries — this guarantees the total can never
+drift out of sync with what filters were actually applied.
+
+**Bug found:** auth_router was imported in main.py but never passed to
+app.include_router() — the entire /auth prefix was silently 404ing. A good
+reminder that "imported" and "wired up" are two different things FastAPI
+won't warn you about.
+
+**pytest suite for products (11 tests):** covers create (success + 400 on a
+nonexistent category), get (200 + 404), update (partial-field correctness,
+and specifically a zero-value case — price/stock set to 0 — since exclude_unset
+logic can silently break on falsy-but-valid values if it's ever written as a
+truthiness check instead of a key-presence check), delete (204 then 404),
+search (with results + empty), and pagination/filtering. Each test creates
+its own isolated category rather than asserting against the DB's grand total,
+since the test DB's tables are created once per test session (not wiped per
+test) — assertions have to be scoped to data the test itself created.
+
+**Dev workflow addition:** Docker Compose now bind-mounts ./backend:/app and
+uvicorn runs with --reload, so plain code changes take effect on save without
+a full docker-compose up --build. --build is still required when
+requirements.txt or the Dockerfile itself changes. This is a deliberate
+dev-only convenience — production builds intentionally skip bind mounts,
+since they undermine image immutability (a running container should reflect
+exactly what was baked into the image, not whatever happens to be on disk).
