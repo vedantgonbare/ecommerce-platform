@@ -4,6 +4,7 @@ class Settings(BaseSettings):
     app_name: str = "E-Commerce Platform"
     database_url: str 
     jwt_secret_key: str
+    redis_url: str
 
     class Config:
         env_file = ".env"
