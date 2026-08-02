@@ -8,6 +8,7 @@ from httpx import AsyncClient, ASGITransport
 from app.main import app
 from app.db.session import async_session_factory
 from app.db.session import get_db
+import uuid
 
 @pytest_asyncio.fixture(scope="session", autouse=True)
 async def setup_test_db():
@@ -29,3 +30,14 @@ async def client():
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac
+
+@pytest_asyncio.fixture
+async def auth_headers(client):
+    email = f"cartuser_{uuid.uuid4().hex[:8]}@example.com"
+    password = "SecurePass123!"
+
+    await client.post("/auth/register", json={"email": email, "password": password})
+    login_response = await client.post("/auth/login", json={"email": email, "password": password})
+
+    token = login_response.json()["access_token"]
+    return {"Authorization": f"Bearer {token}"}
