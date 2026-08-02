@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.session import get_db
 from app.modules.products.schemas import ProductCreate, ProductResponse, ProductUpdate, ProductListResponse
+from app.core.redis import redis_client
 from app.modules.products.service import (
     create_product,
     CategoryNotFoundError,
@@ -31,8 +32,18 @@ async def list_products(
     category_id: uuid.UUID | None = None,
     db: AsyncSession = Depends(get_db),
 ):
+    cache_key = f"products:list:limit={limit}:offset={offset}:category_id={category_id or 'none'}"
+
+    cached = await redis_client.get(cache_key)
+    if cached is not None:
+        return ProductListResponse.model_validate_json(cached)
+
     total, items = await get_all_products(db, limit=limit, offset=offset, category_id=category_id)
-    return ProductListResponse(total=total, limit=limit, offset=offset, items=items)
+    response = ProductListResponse(total=total, limit=limit, offset=offset, items=items)
+
+    await redis_client.set(cache_key, response.model_dump_json(), ex=60)
+
+    return response
 
 # @router.get("/", response_model=list[ProductResponse])                                          # list_products
 # async def list_products(db: AsyncSession = Depends(get_db)):
