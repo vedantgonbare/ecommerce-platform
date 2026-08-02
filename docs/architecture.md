@@ -199,3 +199,74 @@ requirements.txt or the Dockerfile itself changes. This is a deliberate
 dev-only convenience — production builds intentionally skip bind mounts,
 since they undermine image immutability (a running container should reflect
 exactly what was baked into the image, not whatever happens to be on disk).
+
+
+---
+
+## Week 4 — Cart + Redis Caching
+
+### Day 16 — Cart Model
+Built Cart + CartItem as two related tables rather than a single CartItem-with-user_id
+table — gives the cart itself a natural home for future metadata (status, abandoned-cart
+logic) without restructuring later. Two unique constraints do real work here: Cart.user_id
+is unique at the DB level, so "does this user already have a cart" can never race into a
+duplicate; CartItem's composite unique constraint on (cart_id, product_id) is what makes
+bump-not-duplicate structurally enforced rather than just a matter of careful service-layer
+code. cascade="all, delete-orphan" on the relationship means a deleted cart takes its items
+with it automatically.
+
+### Day 17 — Cart Endpoints
+Service layer keys off product_id, not cart_item.id, for update/remove — the frontend
+already has product_id from wherever "add to cart" was clicked, and never needs to know an
+internal cart_item id exists. CartItemResponse can't be populated by from_attributes alone
+since product_name/product_price live on Product, not CartItem — the service explicitly
+joins CartItem against Product to build each response. Every endpoint requires
+Depends(get_current_user), the first module built that's auth-protected end-to-end from day
+one. DELETE /cart/items/{product_id} deliberately returns 200 with the updated cart, not 204
+— unlike deleting a product, removing a cart item leaves something meaningful (the rest of
+the cart) worth returning immediately.
+
+### Day 18 — Redis Cache-Aside Pattern
+Added Redis as a Docker service (redis:7-alpine, mapped to host port 6380 to avoid the same
+kind of port collision Postgres had on Day 5) and wired a redis.asyncio client as shared
+infrastructure in app/core/redis.py, same pattern as the DB session.
+
+Cached GET /products/ using cache-aside: check Redis first, on a miss query Postgres and
+write the result back into Redis with a 60s TTL, on a hit skip the DB entirely. Cache keys
+encode limit/offset/category_id explicitly (e.g. products:list:limit=20:offset=0:category_id=none)
+since different query combinations return genuinely different data — a single flat key would
+have every distinct query stomping on the same cached entry.
+
+Measured, not assumed: a cold request took ~4.5s, the cached hit took ~50ms.
+
+### Day 19 — Cache Invalidation
+The write side of the cache: create_product, update_product, and delete_product now all
+invalidate every cached list variation after their commit succeeds (invalidation happens
+after the write is durable, not before — a failed commit shouldn't wipe a still-valid cache).
+
+Since cache keys are parameterized by limit/offset/category_id, there's no way to know in
+advance every combination a write might affect — the fix is a SCAN-based invalidate_pattern()
+helper that deletes every key matching products:list:*, rather than trying to enumerate
+exact keys. Used Redis's SCAN instead of KEYS deliberately: KEYS blocks the entire server
+while it runs, which is a real bad habit to build even at small scale — SCAN iterates in
+small non-blocking steps instead.
+
+Verified end-to-end, not just "no errors": populated the cache, created a new product,
+immediately confirmed the cache key was gone, then confirmed the next GET returned fresh
+data including the new product rather than the stale cached list.
+
+### Day 20 — Cart Tests + Week 4 Recap
+Wrote a 9-test pytest suite for the cart module, reusing the same isolation principles as
+the Week 3 products suite (every test creates its own category/product, nothing depends on
+another test's leftover data). Added a shared auth_headers fixture in conftest.py — registers
+a throwaway user, logs in, returns a Bearer token header — since cart is the first module
+where every single test needs real authentication, not just some of them.
+
+The bump-quantity test is the one that actually matters here: it proves two separate POSTs
+to add the same product result in one row at quantity 5, not two rows at quantity 2 and 3 —
+the same thing verified manually in Postman on Day 16, now automated and no longer dependent
+on remembering to check it by hand. test_cart_requires_auth is the other easy one to skip
+by accident — it's the only test with no auth_headers at all, proving the 401 path fires
+correctly rather than only ever testing the authenticated happy path.
+
+Full suite (auth + products + cart) passes together: 22 tests.
