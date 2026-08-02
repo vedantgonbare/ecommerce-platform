@@ -5,6 +5,7 @@ from app.modules.products.schemas import ProductCreate, ProductUpdate
 from app.modules.categories.models import Category
 import uuid
 from sqlalchemy import select, func
+from app.core.redis import invalidate_pattern
 
 class CategoryNotFoundError(Exception):
     pass
@@ -28,6 +29,7 @@ async def create_product(db: AsyncSession, product_data: ProductCreate) -> Produ
     db.add(new_product)
     await db.commit()
     await db.refresh(new_product)
+    await invalidate_pattern("products:list:*")
     return new_product
 
 async def get_all_products(
@@ -75,12 +77,14 @@ async def update_product(db, product_id, update_data: ProductUpdate):
 
     await db.commit()
     await db.refresh(product)
+    await invalidate_pattern("products:list:*")
     return product
 
 async def delete_product(db, product_id):
     product = await get_product_or_404(db, product_id)
     await db.delete(product)
     await db.commit()
+    await invalidate_pattern("products:list:*")
 
 
 async def search_products(db: AsyncSession, query: str) -> list[Product]:
