@@ -7,6 +7,7 @@ from app.modules.users.models import User
 from app.modules.categories.models import Category
 from app.modules.products.models import Product
 from app.modules.cart.models import Cart, CartItem
+from app.modules.orders.models import Order, OrderItem
 from app.core.config import settings
 from app.db.base import Base
 
