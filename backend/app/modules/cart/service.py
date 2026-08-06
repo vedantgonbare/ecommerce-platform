@@ -8,7 +8,6 @@ from app.modules.cart.schemas import CartItemResponse, CartResponse
 from app.modules.products.models import Product
 from app.modules.products.service import ProductNotFoundError
 
-
 class CartItemNotFoundError(Exception):
     pass
 
