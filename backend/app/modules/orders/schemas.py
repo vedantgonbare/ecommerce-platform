@@ -26,3 +26,10 @@ class OrderResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class OrderListResponse(BaseModel):
+    total: int
+    limit: int
+    offset: int
+    items: list[OrderResponse]

@@ -1,7 +1,7 @@
 import uuid
 from decimal import Decimal
 
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.cart.models import CartItem
@@ -68,6 +68,52 @@ async def create_order_from_cart(db: AsyncSession, user_id: uuid.UUID) -> Order:
     for cart_item in cart_items:
         await db.delete(cart_item)
 
+    await db.commit()
+    await db.refresh(order, attribute_names=["items"])
+    return order
+
+
+class OrderNotFoundError(Exception):
+    pass
+
+
+class InvalidStatusTransitionError(Exception):
+    def __init__(self, current_status: OrderStatus):
+        self.current_status = current_status
+        super().__init__(f"Cannot cancel an order with status '{current_status.value}'")
+
+
+async def list_orders(db: AsyncSession, user_id: uuid.UUID, limit: int = 20, offset: int = 0):
+    base_query = select(Order).where(Order.user_id == user_id).order_by(Order.created_at.desc())
+
+    count_result = await db.execute(
+        select(func.count()).select_from(base_query.subquery())
+    )
+    total = count_result.scalar_one()
+
+    result = await db.execute(base_query.limit(limit).offset(offset))
+    orders = result.scalars().all()
+
+    return total, orders
+
+
+async def get_order_or_404(db: AsyncSession, user_id: uuid.UUID, order_id: uuid.UUID) -> Order:
+    result = await db.execute(
+        select(Order).where(Order.id == order_id, Order.user_id == user_id)
+    )
+    order = result.scalar_one_or_none()
+    if order is None:
+        raise OrderNotFoundError()
+    return order
+
+
+async def cancel_order(db: AsyncSession, user_id: uuid.UUID, order_id: uuid.UUID) -> Order:
+    order = await get_order_or_404(db, user_id, order_id)
+
+    if order.status not in (OrderStatus.PENDING, OrderStatus.PAID):
+        raise InvalidStatusTransitionError(order.status)
+
+    order.status = OrderStatus.CANCELLED
     await db.commit()
     await db.refresh(order, attribute_names=["items"])
     return order
