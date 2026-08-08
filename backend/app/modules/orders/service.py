@@ -9,6 +9,7 @@ from app.modules.cart.models import CartItem
 from app.modules.cart.service import get_or_create_cart
 from app.modules.products.models import Product
 from app.modules.orders.models import Order, OrderItem, OrderStatus
+from app.modules.orders.tasks import send_order_confirmation
 
 
 class EmptyCartError(Exception):
@@ -71,6 +72,9 @@ async def create_order_from_cart(db: AsyncSession, user_id: uuid.UUID) -> Order:
 
     await db.commit()
     await db.refresh(order, attribute_names=["items"])
+
+    send_order_confirmation.delay(str(order.id))
+    
     return order
 
 
