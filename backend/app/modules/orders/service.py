@@ -2,6 +2,7 @@ import uuid
 from decimal import Decimal
 
 from sqlalchemy import select, func
+from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.cart.models import CartItem
@@ -91,7 +92,9 @@ async def list_orders(db: AsyncSession, user_id: uuid.UUID, limit: int = 20, off
     )
     total = count_result.scalar_one()
 
-    result = await db.execute(base_query.limit(limit).offset(offset))
+    result = await db.execute(
+        base_query.options(selectinload(Order.items)).limit(limit).offset(offset)
+    )
     orders = result.scalars().all()
 
     return total, orders
@@ -99,7 +102,9 @@ async def list_orders(db: AsyncSession, user_id: uuid.UUID, limit: int = 20, off
 
 async def get_order_or_404(db: AsyncSession, user_id: uuid.UUID, order_id: uuid.UUID) -> Order:
     result = await db.execute(
-        select(Order).where(Order.id == order_id, Order.user_id == user_id)
+        select(Order)
+        .options(selectinload(Order.items))
+        .where(Order.id == order_id, Order.user_id == user_id)
     )
     order = result.scalar_one_or_none()
     if order is None:
