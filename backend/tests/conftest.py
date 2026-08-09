@@ -9,6 +9,10 @@ from app.main import app
 from app.db.session import async_session_factory
 from app.db.session import get_db
 import uuid
+from app.core.celery_app import celery_app
+
+celery_app.conf.task_always_eager = True
+celery_app.conf.task_eager_propagates = True
 
 @pytest_asyncio.fixture(scope="session", autouse=True)
 async def setup_test_db():
@@ -41,3 +45,19 @@ async def auth_headers(client):
 
     token = login_response.json()["access_token"]
     return {"Authorization": f"Bearer {token}"}
+
+@pytest_asyncio.fixture
+async def test_product(client):
+    """Creates a fresh category + product for a single test and returns the product's id (str)."""
+    category_response = await client.post("/categories/", json={
+        "name": f"Test Category {uuid.uuid4().hex[:8]}"
+    })
+    category_id = category_response.json()["id"]
+
+    product_response = await client.post("/products/", json={
+        "name": f"Test Product {uuid.uuid4().hex[:8]}",
+        "price": "25.00",
+        "stock_quantity": 100,
+        "category_id": category_id
+    })
+    return product_response.json()["id"]
