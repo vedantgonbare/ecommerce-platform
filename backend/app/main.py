@@ -7,6 +7,7 @@ from app.modules.categories.router import router as categories_router
 from app.modules.products.router import router as products_router
 from app.modules.cart.router import router as cart_router
 from app.modules.orders.router import router as orders_router
+from app.modules.payments.router import router as payments_router
 import stripe
 
 stripe.api_key = settings.stripe_secret_key
@@ -28,3 +29,4 @@ app.include_router(categories_router)
 app.include_router(products_router)
 app.include_router(cart_router)
 app.include_router(orders_router)
+app.include_router(payments_router)
