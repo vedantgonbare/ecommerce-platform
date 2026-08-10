@@ -31,3 +31,4 @@ pytest-asyncio==1.4.0
 httpx==0.28.1
 redis==8.1.0
 celery==5.4.0
+stripe==11.1.1

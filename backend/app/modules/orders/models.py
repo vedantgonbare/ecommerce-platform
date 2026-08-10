@@ -28,6 +28,7 @@ class Order(Base):
     )
     total: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
     created_at: Mapped[object] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    stripe_checkout_session_id: Mapped[str | None] = mapped_column(String, nullable=True)
 
     items: Mapped[list["OrderItem"]] = relationship(
         "OrderItem", back_populates="order", cascade="all, delete-orphan"
