@@ -46,7 +46,8 @@ async def stripe_webhook(request: Request, db: AsyncSession = Depends(get_db)):
 
     if event["type"] == "checkout.session.completed":
         session = event["data"]["object"]
-        order_id = session["metadata"]["order_id"]
-        await mark_order_paid(db, order_id)
+        order_id = session.get("metadata", {}).get("order_id")
+        if order_id:
+            await mark_order_paid(db, order_id)
 
     return {"status": "success"}
