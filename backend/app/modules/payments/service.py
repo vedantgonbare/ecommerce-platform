@@ -1,10 +1,9 @@
 import stripe
 import uuid
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from app.modules.orders.models import OrderStatus
 from app.modules.orders.service import get_order_or_404, InvalidStatusTransitionError
-
+from sqlalchemy import select
+from app.modules.orders.models import Order, OrderStatus
 
 async def create_checkout_session(
     db: AsyncSession, user_id: uuid.UUID, order_id: uuid.UUID
@@ -38,3 +37,14 @@ async def create_checkout_session(
     await db.commit()
 
     return session.url, session.id
+
+
+async def mark_order_paid(db: AsyncSession, order_id: str) -> None:
+    result = await db.execute(select(Order).where(Order.id == order_id))
+    order = result.scalar_one_or_none()
+
+    if order is None:
+        return  # unknown order_id — nothing to update, silently ignore
+
+    order.status = OrderStatus.PAID
+    await db.commit()
