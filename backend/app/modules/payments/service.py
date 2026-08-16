@@ -1,7 +1,8 @@
 import stripe
 import uuid
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.modules.orders.service import get_order_or_404, InvalidStatusTransitionError
+from app.modules.orders.service import get_order_or_404, InvalidStatusTransitionError, OrderNotFoundError
+from sqlalchemy.orm import selectinload
 from sqlalchemy import select
 from app.modules.orders.models import Order, OrderStatus
 
@@ -28,8 +29,8 @@ async def create_checkout_session(
     session = stripe.checkout.Session.create(
         mode="payment",
         line_items=line_items,
-        success_url="http://localhost:8000/payments/success?session_id={CHECKOUT_SESSION_ID}",
-        cancel_url="http://localhost:8000/payments/cancel",
+        success_url="http://localhost:8000/orders/success?session_id={CHECKOUT_SESSION_ID}",
+        cancel_url="http://localhost:8000/orders/cancel",
         metadata={"order_id": str(order.id)},
     )
 
@@ -48,3 +49,16 @@ async def mark_order_paid(db: AsyncSession, order_id: str) -> None:
 
     order.status = OrderStatus.PAID
     await db.commit()
+
+async def get_order_by_session_id(db: AsyncSession, session_id: str) -> Order:
+    result = await db.execute(
+        select(Order)
+        .where(Order.stripe_checkout_session_id == session_id)
+        .options(selectinload(Order.items))
+    )
+    order = result.scalar_one_or_none()
+
+    if order is None:
+        raise OrderNotFoundError(session_id)
+
+    return order

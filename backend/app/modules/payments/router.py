@@ -8,8 +8,9 @@ from app.db.session import get_db
 from app.modules.auth.dependencies import get_current_user
 from app.modules.users.models import User
 from app.modules.orders.service import OrderNotFoundError, InvalidStatusTransitionError
+from app.modules.orders.schemas import OrderResponse
 from app.modules.payments.schemas import CheckoutSessionResponse
-from app.modules.payments.service import create_checkout_session, mark_order_paid
+from app.modules.payments.service import create_checkout_session, mark_order_paid, get_order_by_session_id
 
 router = APIRouter(prefix="/orders", tags=["payments"])
 
@@ -51,3 +52,29 @@ async def stripe_webhook(request: Request, db: AsyncSession = Depends(get_db)):
             await mark_order_paid(db, order_id)
 
     return {"status": "success"}
+
+
+@router.get("/success", response_model=OrderResponse)
+async def payment_success(
+    session_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        order = await get_order_by_session_id(db, session_id)
+    except OrderNotFoundError:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
+
+    return order
+
+
+@router.get("/cancel", response_model=OrderResponse)
+async def payment_cancel(
+    session_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        order = await get_order_by_session_id(db, session_id)
+    except OrderNotFoundError:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
+
+    return order
