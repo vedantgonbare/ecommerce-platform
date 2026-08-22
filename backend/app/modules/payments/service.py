@@ -5,6 +5,7 @@ from app.modules.orders.service import get_order_or_404, InvalidStatusTransition
 from sqlalchemy.orm import selectinload
 from sqlalchemy import select
 from app.modules.orders.models import Order, OrderStatus
+from app.modules.payments.tasks import send_payment_confirmation
 
 async def create_checkout_session(
     db: AsyncSession, user_id: uuid.UUID, order_id: uuid.UUID
@@ -49,6 +50,8 @@ async def mark_order_paid(db: AsyncSession, order_id: str) -> None:
 
     order.status = OrderStatus.PAID
     await db.commit()
+
+    send_payment_confirmation.delay(order_id)
 
 async def get_order_by_session_id(db: AsyncSession, session_id: str) -> Order:
     result = await db.execute(

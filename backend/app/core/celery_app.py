@@ -10,3 +10,4 @@ celery_app = Celery(
 )
 
 from app.modules.orders import tasks  # noqa: F401 — import registers @celery_app.task functions
+from app.modules.payments import tasks  # noqa: F401 — import registers @celery_app.task functions
