@@ -61,3 +61,15 @@ async def test_product(client):
         "category_id": category_id
     })
     return product_response.json()["id"]
+
+
+@pytest_asyncio.fixture
+async def pending_order(client, auth_headers, test_product):
+    """Creates a cart item + order for a single test, returns the order's id (str)."""
+    await client.post(
+        "/cart/items",
+        json={"product_id": test_product, "quantity": 2},
+        headers=auth_headers,
+    )
+    order_response = await client.post("/orders/", headers=auth_headers)
+    return order_response.json()["id"]
