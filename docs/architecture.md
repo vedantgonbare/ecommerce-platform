@@ -283,11 +283,30 @@ Full suite (auth + products + cart) passes together: 22 tests.
 
 **Day 25 — Orders test suite + recap:** 11-test pytest suite for orders (auth requirement, create success/empty-cart/insufficient-stock, stock-decrement-and-cart-clear correctness, list, get-by-id, get-not-found, get-wrong-owner, cancel success, cancel-already-cancelled). The wrong-owner test is the one that actually proves the ownership-filtered query works, by registering a second real user and confirming they get 404 rather than the first user's order. Celery tested via **eager mode** (`task_always_eager=True`, `task_eager_propagates=True`, set in `conftest.py`): `.delay()` runs the task synchronously in-process during tests, so the suite needs no live Redis worker and doesn't pay real task latency, while `task_eager_propagates` ensures a broken task fails the test loudly instead of being silently swallowed (the opposite of real production behavior, deliberately, for test visibility). Moved the `test_product` fixture from `test_cart.py` into shared `conftest.py` since orders needed it too — avoiding duplication ahead of Reviews (Week 7), which will need it again. Full suite: 33 tests passing (auth 3, products 11, cart 8, orders 11).
 
+
 **Test coverage snapshot:** Auth 3, Products 11, Cart 8, Orders 11 — 33 total, all passing together.
 
 ---
 
+## Week 6 — Payments (Stripe) + Notifications
+
+**Day 26 — Checkout session creation:** Used Stripe Checkout (hosted page) over Payment Intents — less frontend work needed before Week 7's React build. No separate `Payment` table — `stripe_checkout_session_id` just lives on `Order`. `metadata={"order_id": ...}` on the session is the bridge the webhook later uses to identify the order. Prices sent in cents, not floats, for the same rounding reasons `Decimal` was chosen back in Week 3.
+
+**Day 27 — Webhook handler:** Reads the raw request body (not a parsed schema) since Stripe's signature is computed over exact bytes. `mark_order_paid` is a separate, trusted lookup by ID only — no ownership check, since there's no user session on a webhook call. **Bug:** direct `session["metadata"]["order_id"]` access crashed on Stripe's synthetic test events, which omit metadata. Fixed with `.get()` and a guard — now the standing rule for any field from an external payload.
+
+**Day 28 — Success/cancel pages:** No auth on these two endpoints — Stripe's redirect has no Authorization header, so the unguessable `session_id` in the URL is the proof instead. Order is looked up by `stripe_checkout_session_id`, not `order_id`, since that's all Stripe's redirect provides. **Bug:** `orders_router` was registered before `payments_router` in `main.py`, so `/orders/success` got matched by `/orders/{order_id}` first and 401'd. Fixed by reordering. Same bug class as Day 14's `/search` issue — route-ordering problems keep resurfacing at different scopes, worth checking first whenever a route 401s/404s unexpectedly.
+
+**Day 29 — Payment confirmation task:** Extended the Day 24 Celery pattern directly — new task, explicit import into `celery_app.py`, triggered with `.delay()` after commit. Kept as a separate task from `send_order_confirmation` rather than reusing it, since "order placed" and "payment received" are genuinely different events. Verified via real worker logs.
+
+**Day 30 — Payments tests + this recap:** First module needing to mock an external system. Used `unittest.mock.patch` to fake `stripe.checkout.Session.create` and `stripe.Webhook.construct_event` — only that one line is mocked per test, everything else runs for real against the test DB. 6 new tests: checkout success/not-found, webhook success/invalid-signature, success-page found/not-found. Full suite: 39 tests passing, no regressions.
+
+**Test coverage snapshot:** Auth 3, Products 11, Cart 8, Orders 11, Payments 6 — 39 total, all passing together.
+
+---
+
 **Known gaps carried forward:**
-- Order status transitions beyond self-cancel await Stripe (Week 6) and an admin role (later)
-- Refresh tokens still stateless (no revocation) — deferred, unchanged from earlier weeks
-- Redis cache (products) still has no automated test coverage — correctness verified manually via Postman/redis-cli only
+- Order transitions beyond self-cancel/webhook-paid (`shipped`/`delivered`) need an admin role — deferred
+- Refresh tokens still stateless — deferred
+- Redis cache still has no automated tests
+- Pydantic v1-style `class Config` still used across schemas — harmless warnings, not cleaned up
+- Stripe SDK calls are sync/blocking inside async routes — acceptable at this scale
