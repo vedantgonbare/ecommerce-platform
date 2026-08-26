@@ -10,6 +10,7 @@ from app.db.session import async_session_factory
 from app.db.session import get_db
 import uuid
 from app.core.celery_app import celery_app
+from app.modules.payments.service import mark_order_paid
 
 celery_app.conf.task_always_eager = True
 celery_app.conf.task_eager_propagates = True
@@ -73,3 +74,12 @@ async def pending_order(client, auth_headers, test_product):
     )
     order_response = await client.post("/orders/", headers=auth_headers)
     return order_response.json()["id"]
+
+@pytest_asyncio.fixture
+async def paid_order(pending_order):
+    """Takes a pending_order and marks it paid directly via the internal
+    trusted-caller function — bypassing Stripe entirely, since we're testing
+    review logic, not payments."""
+    async with async_session_factory() as session:
+        await mark_order_paid(session, pending_order)
+    return pending_order
