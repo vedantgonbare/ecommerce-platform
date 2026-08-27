@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Response
+from fastapi import APIRouter, Depends, HTTPException, status, Response, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.session import get_db   
 from app.modules.auth.schemas import UserCreate, UserResponse
@@ -64,14 +64,19 @@ async def login(credentials: UserLogin, response: Response, db: AsyncSession = D
 async def read_current_user(current_user: User = Depends(get_current_user)):
     return current_user
 
-@router.post("/refresh", response_model=Token)
-async def refresh(request: RefreshRequest):
+@router.post("/refresh")
+async def refresh(request: Request, response: Response):
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate refresh token",
     )
+
+    refresh_token = request.cookies.get("refresh_token")
+    if refresh_token is None:
+        raise credentials_exception
+
     try:
-        payload = jwt.decode(request.refresh_token, settings.jwt_secret_key, algorithms=[ALGORITHM])
+        payload = jwt.decode(refresh_token, settings.jwt_secret_key, algorithms=[ALGORITHM])
         if payload.get("type") != "refresh":
             raise credentials_exception
         user_id = payload.get("sub")
@@ -81,4 +86,14 @@ async def refresh(request: RefreshRequest):
         raise credentials_exception
 
     new_access_token = create_access_token(user_id)
-    return Token(access_token=new_access_token)
+
+    response.set_cookie(
+        key="access_token",
+        value=new_access_token,
+        httponly=True,
+        secure=False,
+        samesite="lax",
+        max_age=60 * 30,
+    )
+
+    return {"message": "Token refreshed"}
