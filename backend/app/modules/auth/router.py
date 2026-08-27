@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.session import get_db   
 from app.modules.auth.schemas import UserCreate, UserResponse
@@ -28,8 +28,8 @@ async def register(user_data: UserCreate, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already registered")
     return new_user
 
-@router.post("/login", response_model=Token)
-async def login(credentials: UserLogin, db: AsyncSession = Depends(get_db)):
+@router.post("/login")
+async def login(credentials: UserLogin, response: Response, db: AsyncSession = Depends(get_db)):
     try:
         user = await authenticate_user(db, credentials.email, credentials.password)
     except InvalidCredentialsError:
@@ -40,7 +40,25 @@ async def login(credentials: UserLogin, db: AsyncSession = Depends(get_db)):
 
     access_token = create_access_token(str(user.id))
     refresh_token = create_refresh_token(str(user.id))
-    return Token(access_token=access_token, refresh_token=refresh_token)
+
+    response.set_cookie(
+        key="access_token",
+        value=access_token,
+        httponly=True,
+        secure=False,
+        samesite="lax",
+        max_age=60 * 30,
+    )
+    response.set_cookie(
+        key="refresh_token",
+        value=refresh_token,
+        httponly=True,
+        secure=False,
+        samesite="lax",
+        max_age=60 * 60 * 24 * 7,
+    )
+
+    return {"message": "Login successful"}
 
 @router.get("/me", response_model=UserResponse)
 async def read_current_user(current_user: User = Depends(get_current_user)):
