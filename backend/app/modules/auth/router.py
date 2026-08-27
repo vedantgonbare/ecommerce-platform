@@ -97,3 +97,9 @@ async def refresh(request: Request, response: Response):
     )
 
     return {"message": "Token refreshed"}
+
+@router.post("/logout")
+async def logout(response: Response):
+    response.delete_cookie(key="access_token")
+    response.delete_cookie(key="refresh_token")
+    return {"message": "Logged out"}
