@@ -38,14 +38,19 @@ async def client():
 
 @pytest_asyncio.fixture
 async def auth_headers(client):
+    """Registers and logs in a throwaway user on the shared `client`.
+    httpx.AsyncClient persists cookies automatically across requests made on
+    the same instance — so after this fixture runs, `client` is already
+    authenticated for the rest of the test. The empty dict is returned only
+    so existing `headers=auth_headers` call sites keep working as harmless
+    no-ops; it carries no actual auth information anymore."""
     email = f"cartuser_{uuid.uuid4().hex[:8]}@example.com"
     password = "SecurePass123!"
 
     await client.post("/auth/register", json={"email": email, "password": password})
-    login_response = await client.post("/auth/login", json={"email": email, "password": password})
+    await client.post("/auth/login", json={"email": email, "password": password})
 
-    token = login_response.json()["access_token"]
-    return {"Authorization": f"Bearer {token}"}
+    return {}
 
 @pytest_asyncio.fixture
 async def test_product(client):

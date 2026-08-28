@@ -42,5 +42,6 @@ async def test_login_success(client):
 
     assert response.status_code == 200
     data = response.json()
-    assert "access_token" in data
-    assert "refresh_token" in data
+    assert data["message"] == "Login successful"
+    assert "access_token" in response.cookies
+    assert "refresh_token" in response.cookies

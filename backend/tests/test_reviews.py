@@ -99,13 +99,11 @@ async def test_update_review_wrong_owner_404(client, auth_headers, paid_order, t
 
     other_email = f"other_{uuid.uuid4().hex[:8]}@example.com"
     await client.post("/auth/register", json={"email": other_email, "password": "SecurePass123!"})
-    login_response = await client.post("/auth/login", json={"email": other_email, "password": "SecurePass123!"})
-    other_headers = {"Authorization": f"Bearer {login_response.json()['access_token']}"}
+    await client.post("/auth/login", json={"email": other_email, "password": "SecurePass123!"})
 
     response = await client.patch(
         f"/reviews/{review_id}",
         json={"rating": 1},
-        headers=other_headers,
     )
     assert response.status_code == 404
 

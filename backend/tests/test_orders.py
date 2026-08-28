@@ -103,10 +103,9 @@ async def test_get_order_not_found(client, auth_headers):
 async def test_get_order_wrong_owner(client, auth_headers, order_from_cart):
     other_email = f"other_{uuid.uuid4().hex[:8]}@example.com"
     await client.post("/auth/register", json={"email": other_email, "password": "SecurePass123!"})
-    login = await client.post("/auth/login", json={"email": other_email, "password": "SecurePass123!"})
-    other_headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
+    await client.post("/auth/login", json={"email": other_email, "password": "SecurePass123!"})
 
-    response = await client.get(f"/orders/{order_from_cart['id']}", headers=other_headers)
+    response = await client.get(f"/orders/{order_from_cart['id']}")
     assert response.status_code == 404
 
 
