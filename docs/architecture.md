@@ -310,3 +310,64 @@ Full suite (auth + products + cart) passes together: 22 tests.
 - Redis cache still has no automated tests
 - Pydantic v1-style `class Config` still used across schemas — harmless warnings, not cleaned up
 - Stripe SDK calls are sync/blocking inside async routes — acceptable at this scale
+
+## Week 7 (cont.) — httpOnly Cookie Auth Conversion (Day 33)
+
+**What changed:** Auth switched from returning JWT access + refresh tokens in the
+JSON response body (client stores them itself, sends via `Authorization: Bearer`)
+to the server setting both tokens as httpOnly cookies. The browser now handles
+storage and attachment automatically; JavaScript never touches the tokens at all.
+
+**Why:** An httpOnly cookie cannot be read by `document.cookie` or any client-side
+JS. Even a successful XSS attack that got arbitrary JS running on the page still
+couldn't exfiltrate the token — this is the main advantage over `localStorage`,
+which is trivially readable by any script running on the page, malicious or not.
+
+**New endpoint — `POST /auth/logout`:** didn't exist before, because there was
+never anything for the server to do on logout under the Bearer-token model — the
+frontend just discarded the token from wherever it stored it. With httpOnly
+cookies, the frontend *can't* discard them (it can't see them), so the server has
+to explicitly tell the browser to forget them via `delete_cookie()`.
+
+**Cookie flags used:** `httponly=True` (JS-inaccessible), `secure=False` for local
+dev over plain HTTP (flips to `True` in production, since `secure` cookies are
+silently refused by browsers over non-HTTPS), `samesite="lax"` (cookie rides along
+on same-site requests and top-level navigation, but not on cross-site subrequests
+— a reasonable default that blocks most CSRF vectors without breaking normal use).
+
+**Tradeoffs carried forward, unchanged from the original design:**
+- Still no server-side token revocation/blacklisting. Logout clears the *browser's*
+  copy of the cookie, but a raw token captured before logout (e.g. via a network
+  intercept) remains cryptographically valid until its natural expiry. This was
+  already true under the Bearer-token model — cookies don't make it worse, but
+  they don't fix it either. Flagged as a future improvement, same as before.
+
+**New tradeoff introduced by this change:**
+- Cookies are sent automatically by the browser on every matching-origin request,
+  which is exactly the mechanism CSRF attacks exploit (a malicious site could
+  trigger a request to our API and have the browser attach our cookies without
+  the user's intent). `SameSite=Lax` mitigates most practical CSRF risk for this
+  project's scope by blocking the cookie on cross-site subrequests, though a
+  dedicated CSRF token would be the fuller fix for a production-grade app.
+
+**CORS became mandatory, not optional:** `CORSMiddleware` added with
+`allow_credentials=True` and an explicit frontend origin (`allow_origins=["*"]`
+is rejected by browsers once credentials are involved — origins must be named
+explicitly). Without this, the future React frontend would never have been able
+to send or receive the auth cookies cross-origin (`localhost:8000` vs
+`localhost:5173` count as different origins despite both being "localhost").
+
+**Testing implications:** `httpx.AsyncClient` maintains its own cookie jar across
+requests, just like a real browser tab — so `conftest.py`'s `auth_headers` fixture
+no longer needs to manually build and pass an `Authorization` header; it just logs
+the shared `client` in once, and every subsequent request on that same client
+carries the session automatically. Any test that manually parsed a token out of
+the login response body to build a second identity's headers needed rewriting to
+just log that second user in on the same client instead (caught two such cases in
+`test_orders.py` and `test_reviews.py`'s wrong-owner tests).
+
+**Process note:** done on a dedicated `feature/httponly-cookie-auth` branch,
+committed at each verified sub-step (login → get_current_user → refresh → logout
+→ CORS → tests → Postman), merged to `main` only after full regression (49/49
+pytest, full Postman collection) passed. `main` was never in a broken state at
+any point during the conversion.
