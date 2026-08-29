@@ -7,7 +7,7 @@ import './App.css'
 function App() {
   const [count, setCount] = useState(0)
 
-  return (
+    return (
     <>
       <section id="center">
         <div className="hero">
@@ -66,7 +66,7 @@ function App() {
                 <svg
                   className="button-icon"
                   role="presentation"
-                  aria-hidden="true"
+                  aria-hidden="true" 
                 >
                   <use href="/icons.svg#github-icon"></use>
                 </svg>
