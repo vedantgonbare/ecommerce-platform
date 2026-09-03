@@ -2,6 +2,7 @@ import { Routes, Route, Link } from 'react-router-dom'
 import Login from './pages/Login'
 import Register from './pages/Register'
 import { useAuth } from './context/AuthContext'
+import Products from './pages/Products'
 
 function Home() {
   return <h1>Home Page</h1>
@@ -32,6 +33,7 @@ function App() {
         <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/products" element={<Products />} />
       </Routes>
     </div>
   )
