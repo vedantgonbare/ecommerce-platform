@@ -4,6 +4,7 @@ import Register from './pages/Register'
 import { useAuth } from './context/AuthContext'
 import Products from './pages/Products'
 import ProductDetail from './pages/ProductDetail'
+import Cart from './pages/Cart'
 
 function Home() {
   return <h1>Home Page</h1>
@@ -26,6 +27,7 @@ function App() {
     <>
       <Link to="/login" className="text-blue-600 underline">Login</Link>
       <Link to="/register" className="text-blue-600 underline">Register</Link>
+      <Link to="/cart" className="text-blue-600 underline">Cart</Link>
     </>
   )}
 </nav>
@@ -36,6 +38,7 @@ function App() {
         <Route path="/register" element={<Register />} />
         <Route path="/products" element={<Products />} />
         <Route path="/products/:id" element={<ProductDetail />} />
+        <Route path="/cart" element={<Cart />} />
       </Routes>
     </div>
   )
