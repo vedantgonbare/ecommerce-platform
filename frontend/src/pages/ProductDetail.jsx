@@ -1,9 +1,17 @@
 import { useParams } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '../api/client'
 
 function ProductDetail() {
   const { id } = useParams()
+  const queryClient = useQueryClient()
+
+  const addToCart = useMutation({
+    mutationFn: () => api.post('/cart/items', { product_id: id, quantity: 1 }),
+    onSuccess: (data) => {
+      queryClient.setQueryData(['cart'], data)
+    },
+  })
 
   const {
     data: product,
@@ -19,7 +27,7 @@ function ProductDetail() {
     queryFn: () => api.get(`/products/${id}/reviews`),
   })
 
-    if (productLoading) return <p className="p-8">Loading product...</p>
+  if (productLoading) return <p className="p-8">Loading product...</p>
   if (productError) return <p className="p-8 text-red-600">Failed to load product: {productError.message}</p>
 
   return (
@@ -50,6 +58,19 @@ function ProductDetail() {
           ))}
         </div>
       )}
+
+      <div className="mt-6">
+        <button
+          onClick={() => addToCart.mutate()}
+          disabled={addToCart.isPending || product.stock_quantity === 0}
+          className="bg-blue-600 text-white px-4 py-2 rounded disabled:opacity-50"
+        >
+          {addToCart.isPending ? 'Adding...' : 'Add to Cart'}
+        </button>
+        {addToCart.error && (
+          <p className="text-red-600 text-sm mt-2">{addToCart.error.message}</p>
+        )}
+      </div>
     </div>
   )
 }
