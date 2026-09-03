@@ -5,6 +5,8 @@ import { useAuth } from './context/AuthContext'
 import Products from './pages/Products'
 import ProductDetail from './pages/ProductDetail'
 import Cart from './pages/Cart'
+import OrderSuccess from './pages/OrderSuccess'
+import OrderCancel from './pages/OrderCancel'
 
 function Home() {
   return <h1>Home Page</h1>
@@ -39,6 +41,8 @@ function App() {
         <Route path="/products" element={<Products />} />
         <Route path="/products/:id" element={<ProductDetail />} />
         <Route path="/cart" element={<Cart />} />
+        <Route path="/orders/success" element={<OrderSuccess />} />
+        <Route path="/orders/cancel" element={<OrderCancel />} />
       </Routes>
     </div>
   )
