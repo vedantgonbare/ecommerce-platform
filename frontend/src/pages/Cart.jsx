@@ -24,6 +24,17 @@ function Cart() {
     },
   })
 
+    const checkout = useMutation({
+    mutationFn: async () => {
+      const order = await api.post('/orders/')
+      const session = await api.post(`/orders/${order.id}/checkout`)
+      return session
+    },
+    onSuccess: (session) => {
+      window.location.href = session.checkout_url
+    },
+  })
+
     if (isLoading) return <p className="p-8">Loading cart...</p>
   if (error) return <p className="p-8 text-red-600">Failed to load cart: {error.message}</p>
 
@@ -68,6 +79,13 @@ function Cart() {
 
           <div className="flex justify-between items-center mt-6">
             <p className="text-lg font-semibold">Subtotal: ${cart.subtotal}</p>
+            <button
+             onClick={() => checkout.mutate()}
+             disabled={checkout.isPending}
+             className="bg-blue-600 text-white px-4 py-2 rounded disabled:opacity-50"
+            >
+              {checkout.isPending ? 'Redirecting...' : 'Proceed to Checkout'}
+            </button>
           </div>
         </>
       )}
