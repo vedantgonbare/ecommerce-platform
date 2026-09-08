@@ -7,6 +7,7 @@ import ProductDetail from './pages/ProductDetail'
 import Cart from './pages/Cart'
 import OrderSuccess from './pages/OrderSuccess'
 import OrderCancel from './pages/OrderCancel'
+import Orders from './pages/Orders'
 
 function Home() {
   return <h1>Home Page</h1>
@@ -30,6 +31,7 @@ function App() {
       <Link to="/login" className="text-blue-600 underline">Login</Link>
       <Link to="/register" className="text-blue-600 underline">Register</Link>
       <Link to="/cart" className="text-blue-600 underline">Cart</Link>
+      <Link to="/orders" className="text-blue-600 underline">Orders</Link>
     </>
   )}
 </nav>
@@ -43,6 +45,7 @@ function App() {
         <Route path="/cart" element={<Cart />} />
         <Route path="/orders/success" element={<OrderSuccess />} />
         <Route path="/orders/cancel" element={<OrderCancel />} />
+        <Route path="/orders" element={<Orders />} />
       </Routes>
     </div>
   )
