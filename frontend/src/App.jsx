@@ -8,6 +8,7 @@ import Cart from './pages/Cart'
 import OrderSuccess from './pages/OrderSuccess'
 import OrderCancel from './pages/OrderCancel'
 import Orders from './pages/Orders'
+import OrderDetail from './pages/OrderDetail'
 
 function Home() {
   return <h1>Home Page</h1>
@@ -46,6 +47,7 @@ function App() {
         <Route path="/orders/success" element={<OrderSuccess />} />
         <Route path="/orders/cancel" element={<OrderCancel />} />
         <Route path="/orders" element={<Orders />} />
+        <Route path="/orders/:id" element={<OrderDetail />} />
       </Routes>
     </div>
   )
