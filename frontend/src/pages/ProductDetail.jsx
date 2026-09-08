@@ -1,6 +1,7 @@
 import { useParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '../api/client'
+import { useState } from 'react'
 
 function ProductDetail() {
   const { id } = useParams()
@@ -10,6 +11,18 @@ function ProductDetail() {
     mutationFn: () => api.post('/cart/items', { product_id: id, quantity: 1 }),
     onSuccess: (data) => {
       queryClient.setQueryData(['cart'], data)
+    },
+  })
+
+  const [rating, setRating] = useState(5)
+  const [comment, setComment] = useState('')
+
+  const submitReview = useMutation({
+    mutationFn: () =>
+      api.post(`/products/${id}/reviews`, { rating, comment: comment || undefined }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['reviews', id] })
+      setComment('')
     },
   })
 
@@ -70,6 +83,51 @@ function ProductDetail() {
         {addToCart.error && (
           <p className="text-red-600 text-sm mt-2">{addToCart.error.message}</p>
         )}
+      </div>
+            <div className="mt-8 border-t pt-6">
+        <h2 className="text-lg font-semibold mb-2">Leave a Review</h2>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault()
+            submitReview.mutate()
+          }}
+          className="flex flex-col gap-3 max-w-sm"
+        >
+          <label className="flex flex-col gap-1">
+            Rating
+            <select
+              value={rating}
+              onChange={(e) => setRating(Number(e.target.value))}
+              className="border rounded p-2"
+            >
+              {[5, 4, 3, 2, 1].map((n) => (
+                <option key={n} value={n}>{n} / 5</option>
+              ))}
+            </select>
+          </label>
+
+          <label className="flex flex-col gap-1">
+            Comment (optional)
+            <textarea
+              value={comment}
+              onChange={(e) => setComment(e.target.value)}
+              rows={3}
+              className="border rounded p-2"
+            />
+          </label>
+
+          <button
+            type="submit"
+            disabled={submitReview.isPending}
+            className="bg-blue-600 text-white px-4 py-2 rounded disabled:opacity-50"
+          >
+            {submitReview.isPending ? 'Submitting...' : 'Submit Review'}
+          </button>
+
+          {submitReview.error && (
+            <p className="text-red-600 text-sm">{submitReview.error.message}</p>
+          )}
+        </form>
       </div>
     </div>
   )
