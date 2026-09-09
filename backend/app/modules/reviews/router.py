@@ -14,6 +14,7 @@ from app.modules.reviews.service import (
     delete_review,
     ReviewNotFoundError,
     UnverifiedPurchaseError,
+    DuplicateReviewError,
 )
 
 router = APIRouter(tags=["reviews"])
@@ -33,6 +34,11 @@ async def create_product_review(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You can only review products you have purchased",
         )
+    except DuplicateReviewError:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="You have already reviewed this product",
+    )
     return review
 
 
