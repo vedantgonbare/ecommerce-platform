@@ -15,6 +15,8 @@ class ReviewNotFoundError(Exception):
 class UnverifiedPurchaseError(Exception):
     pass
 
+class DuplicateReviewError(Exception):
+    pass
 
 async def has_verified_purchase(db: AsyncSession, user_id: uuid.UUID, product_id: uuid.UUID) -> bool:
     result = await db.execute(
@@ -28,12 +30,20 @@ async def has_verified_purchase(db: AsyncSession, user_id: uuid.UUID, product_id
     )
     return result.first() is not None
 
+async def has_existing_review(db: AsyncSession, user_id: uuid.UUID, product_id: uuid.UUID) -> bool:
+    result = await db.execute(
+        select(Review.id).where(Review.user_id == user_id, Review.product_id == product_id)
+    )
+    return result.first() is not None
 
 async def create_review(
     db: AsyncSession, user_id: uuid.UUID, product_id: uuid.UUID, data: ReviewCreate
 ) -> Review:
     if not await has_verified_purchase(db, user_id, product_id):
         raise UnverifiedPurchaseError()
+
+    if await has_existing_review(db, user_id, product_id):
+        raise DuplicateReviewError()
 
     review = Review(
         product_id=product_id,
