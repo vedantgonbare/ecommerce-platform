@@ -1,6 +1,15 @@
 import uuid
 import pytest
+import pytest
 
+
+@pytest.mark.asyncio
+async def test_create_review_requires_auth(client, test_product):
+    response = await client.post(
+        f"/products/{test_product}/reviews",
+        json={"rating": 5, "comment": "Great!"},
+    )
+    assert response.status_code == 401
 
 @pytest.mark.asyncio
 async def test_create_review_unverified_purchase_403(client, auth_headers, pending_order, test_product):
@@ -24,6 +33,14 @@ async def test_create_review_success_201(client, auth_headers, paid_order, test_
     assert body["rating"] == 4
     assert body["comment"] == "Solid product"
 
+@pytest.mark.asyncio
+async def test_create_review_duplicate_409(client, auth_headers, review_from_paid_order, test_product):
+    response = await client.post(
+        f"/products/{test_product}/reviews",
+        json={"rating": 3, "comment": "Trying again"},
+        headers=auth_headers,
+    )
+    assert response.status_code == 409
 
 @pytest.mark.asyncio
 async def test_create_review_invalid_rating_422(client, auth_headers, paid_order, test_product):

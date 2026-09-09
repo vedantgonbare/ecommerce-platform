@@ -88,3 +88,21 @@ async def paid_order(pending_order):
     async with async_session_factory() as session:
         await mark_order_paid(session, pending_order)
     return pending_order
+
+@pytest_asyncio.fixture
+async def review_from_paid_order(client, auth_headers, paid_order, test_product):
+    """Creates a review for a single test, returns the review response JSON."""
+    response = await client.post(
+        f"/products/{test_product}/reviews",
+        json={"rating": 4, "comment": "Solid product"},
+        headers=auth_headers,
+    )
+    return response.json()
+
+@pytest_asyncio.fixture
+async def other_user_logged_in(client):
+    """Registers and logs in a second, independent user on the same client,
+    switching the active session. Caller is now authenticated as this user."""
+    email = f"other_{uuid.uuid4().hex[:8]}@example.com"
+    await client.post("/auth/register", json={"email": email, "password": "SecurePass123!"})
+    await client.post("/auth/login", json={"email": email, "password": "SecurePass123!"})
