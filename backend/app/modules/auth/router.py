@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Response, Request
+from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.session import get_db   
 from app.modules.auth.schemas import UserCreate, UserResponse
@@ -16,6 +17,7 @@ from app.modules.auth.dependencies import get_current_user
 from jose import jwt, JWTError
 from app.modules.auth.security import create_access_token, create_refresh_token, ALGORITHM
 from app.core.config import settings
+from app.modules.auth.token_revocation import revoke_refresh_token, is_refresh_token_revoked
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -82,6 +84,9 @@ async def refresh(request: Request, response: Response):
         user_id = payload.get("sub")
         if user_id is None:
             raise credentials_exception
+        jti = payload.get("jti")
+        if jti is not None and await is_refresh_token_revoked(jti):
+            raise credentials_exception
     except (JWTError, ValueError):
         raise credentials_exception
 
@@ -99,7 +104,19 @@ async def refresh(request: Request, response: Response):
     return {"message": "Token refreshed"}
 
 @router.post("/logout")
-async def logout(response: Response):
+async def logout(request: Request, response: Response):
+    refresh_token = request.cookies.get("refresh_token")
+    if refresh_token is not None:
+        try:
+            payload = jwt.decode(refresh_token, settings.jwt_secret_key, algorithms=[ALGORITHM])
+            jti = payload.get("jti")
+            exp = payload.get("exp")
+            if jti is not None and exp is not None:
+                expire = datetime.fromtimestamp(exp, tz=timezone.utc)
+                await revoke_refresh_token(jti, expire)
+        except (JWTError, ValueError):
+            pass  # already-invalid token, nothing meaningful to revoke
+
     response.delete_cookie(key="access_token")
     response.delete_cookie(key="refresh_token")
     return {"message": "Logged out"}

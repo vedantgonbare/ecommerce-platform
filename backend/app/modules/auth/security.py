@@ -1,7 +1,8 @@
 from passlib.context import CryptContext
 from datetime import datetime, timedelta, timezone
 from jose import jwt
-from app.core.config import settings 
+from app.core.config import settings
+import uuid 
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -24,6 +25,6 @@ REFRESH_TOKEN_EXPIRE_DAYS = 7
 
 def create_refresh_token(user_id: str) -> str:
     expire = datetime.now(timezone.utc) + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
-    payload = {"sub": user_id, "exp": expire, "type": "refresh"}
+    payload = {"sub": user_id, "exp": expire, "type": "refresh", "jti": str(uuid.uuid4())}
     token = jwt.encode(payload, settings.jwt_secret_key, algorithm=ALGORITHM)
     return token
