@@ -6,7 +6,7 @@ from app.modules.categories.service import create_category, SlugAlreadyExistsErr
 import uuid
 from app.modules.categories.service import get_all_categories, get_category_by_id
 from app.modules.categories.schemas import CategoryUpdate
-from app.modules.categories.service import update_category
+from app.modules.categories.service import update_category, CategoryCycleError, ParentCategoryNotFoundError
 from app.modules.categories.service import delete_category, CategoryHasChildrenError
 
 router = APIRouter(prefix="/categories", tags=["categories"])
@@ -39,7 +39,18 @@ async def update(category_id: uuid.UUID, update_data: CategoryUpdate, db: AsyncS
         updated_category = await update_category(db, category, update_data)
     except SlugAlreadyExistsError:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="A category with this name already exists")
+    except CategoryCycleError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This update would create a circular category hierarchy",
+        )
+    except ParentCategoryNotFoundError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="The specified parent category does not exist",
+        )
     return updated_category
+
 
 
 @router.delete("/{category_id}", status_code=status.HTTP_204_NO_CONTENT)

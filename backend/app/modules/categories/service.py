@@ -17,6 +17,25 @@ def slugify(name: str) -> str:
 class SlugAlreadyExistsError(Exception):
     pass
 
+class CategoryCycleError(Exception):
+    pass
+
+class ParentCategoryNotFoundError(Exception):
+    pass
+
+
+async def would_create_cycle(db: AsyncSession, category_id: uuid.UUID, new_parent_id: uuid.UUID) -> bool:
+    """Walks up the ancestor chain starting at new_parent_id. Returns True if category_id
+    is found along that chain, meaning assigning new_parent_id would create a cycle."""
+    current_id = new_parent_id
+    while current_id is not None:
+        if current_id == category_id:
+            return True
+        result = await db.execute(select(Category.parent_id).where(Category.id == current_id))
+        current_id = result.scalar_one_or_none()
+    return False
+
+
 async def create_category(db: AsyncSession, category_data: CategoryCreate) -> Category:
     slug = slugify(category_data.name)
 
@@ -49,6 +68,11 @@ async def update_category(db: AsyncSession, category: Category, update_data: Cat
         category.name = update_data.name
         category.slug = slugify(update_data.name)
     if update_data.parent_id is not None:
+        parent = await get_category_by_id(db, update_data.parent_id)
+        if parent is None:
+            raise ParentCategoryNotFoundError()
+        if await would_create_cycle(db, category.id, update_data.parent_id):
+            raise CategoryCycleError()
         category.parent_id = update_data.parent_id
 
     try:
