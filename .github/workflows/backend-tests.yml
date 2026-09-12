@@ -10,9 +10,44 @@ jobs:
   test:
     runs-on: ubuntu-latest
 
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: ecommerce_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - name: Check out code
         uses: actions/checkout@v4
 
       - name: Show Python version (sanity check)
         run: python3 --version
+
+      - name: Wait for Postgres and check readiness
+        run: |
+          sudo apt-get install -y postgresql-client
+          pg_isready -h localhost -p 5432 -U postgres
+
+      - name: Check Redis readiness
+        run: |
+          sudo apt-get install -y redis-tools
+          redis-cli -h localhost -p 6379 ping
