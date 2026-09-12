@@ -1,5 +1,8 @@
 import os
-os.environ["DATABASE_URL"] = "postgresql+asyncpg://postgres:postgres18@localhost:5433/ecommerce_test"
+os.environ.setdefault(
+    "DATABASE_URL",
+    "postgresql+asyncpg://postgres:postgres18@localhost:5433/ecommerce_test",
+)
 import pytest_asyncio
 from app.db.base import Base
 from app.modules.users.models import User  # noqa: F401 — import registers the table
