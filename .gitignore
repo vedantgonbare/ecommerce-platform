@@ -16,3 +16,7 @@ venv/
 
 # OS
 .DS_Storecookies.txt
+
+# Node / Frontend
+node_modules/
+dist/
