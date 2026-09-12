@@ -58,3 +58,7 @@ jobs:
       - name: Run Alembic migrations
         working-directory: backend
         run: alembic upgrade head
+
+      - name: Run pytest suite
+        working-directory: backend
+        run: python -m pytest -v
