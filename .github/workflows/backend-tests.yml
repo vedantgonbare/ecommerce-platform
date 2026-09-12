@@ -35,19 +35,26 @@ jobs:
           --health-timeout 5s
           --health-retries 5
 
+    env:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/ecommerce_test
+      JWT_SECRET_KEY: ci-test-secret-key-not-for-production
+      REDIS_URL: redis://localhost:6379/0
+      STRIPE_SECRET_KEY: sk_test_dummy_placeholder
+      STRIPE_WEBHOOK_SECRET: whsec_dummy_placeholder
+
     steps:
       - name: Check out code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
-      - name: Show Python version (sanity check)
-        run: python3 --version
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
 
-      - name: Wait for Postgres and check readiness
-        run: |
-          sudo apt-get install -y postgresql-client
-          pg_isready -h localhost -p 5432 -U postgres
+      - name: Install dependencies
+        working-directory: backend
+        run: pip install -r requirements.txt
 
-      - name: Check Redis readiness
-        run: |
-          sudo apt-get install -y redis-tools
-          redis-cli -h localhost -p 6379 ping
+      - name: Run Alembic migrations
+        working-directory: backend
+        run: alembic upgrade head
