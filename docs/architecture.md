@@ -311,6 +311,51 @@ Full suite (auth + products + cart) passes together: 22 tests.
 - Pydantic v1-style `class Config` still used across schemas — harmless warnings, not cleaned up
 - Stripe SDK calls are sync/blocking inside async routes — acceptable at this scale
 
+
+## Week 7 — Reviews Module (Days 31–32)
+
+**Day 31 — Review model:** Design decided up front: multiple reviews per user
+per product are allowed (not one-per-product — that gap wasn't closed until
+Day 36), and a review requires a verified purchase. "Verified" is enforced
+against order `status == PAID` (or `SHIPPED`/`DELIVERED`, though those states
+don't exist yet without an admin role) rather than strictly `DELIVERED` —
+requiring `DELIVERED` would make reviews impossible in practice given that
+transition doesn't exist yet.
+
+`Review` model: `product_id`/`user_id` FKs, `rating` (Integer), `comment`
+(nullable), `created_at`. New pattern for this project: a DB-level
+`CheckConstraint("rating BETWEEN 1 AND 5")` in `__table_args__`, making an
+invalid rating structurally impossible at the database layer, not just
+Pydantic-validated — the same "make invalid states impossible" philosophy
+as the `order_status` Postgres enum from Week 5.
+
+**Day 32 — Endpoints, testing, and three real bugs:** `has_verified_purchase()`
+is a new query shape for this project — joins `Order` to `OrderItem` to check
+for any matching paid order containing the product. `UnverifiedPurchaseError`
+maps to **403**, not 404 or 409 — a genuinely new status-code case: the user
+and product both exist, they just haven't earned the right to review yet
+(an authorization failure, not a not-found or a conflict). `get_review_or_404`
+reuses the ownership-in-WHERE-clause pattern from Orders (Week 5) — wrong
+owner and nonexistent review both produce the identical 404.
+
+Router has no single `prefix=` — a first for this project — since review
+routes genuinely span two different path families (`/products/{id}/reviews`
+for create/list, `/reviews/{id}` for update/delete).
+
+Three real bugs chased down during manual testing, each instructive: (1) a
+review attempt correctly 403'd on an order that *looked* paid but the Stripe
+Pay button was never actually clicked — a correct rejection initially
+mistaken for a bug; (2) the Stripe CLI webhook listener was off, so a real
+payment never flipped the order to `paid` — a reminder that the listener
+doesn't persist across sessions and needs restarting each time; (3) a stale
+Postman environment variable (`{{product_id}}` still holding an old order ID
+from an earlier test run) caused a 403 even against a genuinely paid order —
+not a logic bug at all, just stale test data.
+
+Reviews pytest suite deliberately deferred to Week 8 (Day 36) rather than
+rushed after a long debugging session.
+
+
 ## Week 7 (cont.) — httpOnly Cookie Auth Conversion (Day 33)
 
 **What changed:** Auth switched from returning JWT access + refresh tokens in the
@@ -371,3 +416,243 @@ committed at each verified sub-step (login → get_current_user → refresh → 
 → CORS → tests → Postman), merged to `main` only after full regression (49/49
 pytest, full Postman collection) passed. `main` was never in a broken state at
 any point during the conversion.
+
+
+## Week 7 — React Frontend Build (Days 33 cont.–35)
+
+**Stack decisions (confirmed before writing code):** Vite + React, JavaScript
+not TypeScript (deliberate — keep focus on React/Vite/Tailwind concepts
+without adding a type system on day one), Tailwind CSS v4 (`@tailwindcss/vite`
+plugin — the entire config is one `@import "tailwindcss";` line, a real
+departure from v3's `tailwind.config.js`/PostCSS pipeline), React Router
+(`BrowserRouter`), TanStack Query for all server-state fetching rather than
+plain `fetch`/local state — more concepts, better caching and loading-state
+patterns, worth the investment.
+
+**Centralized API client (`src/api/client.js`):** every request sets
+`credentials: 'include'` unconditionally — the one line that makes the
+httpOnly-cookie auth actually work cross-origin, since `localhost:5173` and
+`localhost:8000` are different origins despite both being "localhost."
+Unwraps the backend's `{"detail": "..."}` error shape into a real JS `Error`
+with a readable `.message`, matching every `HTTPException` across the whole
+backend. No components ever call raw `fetch()` — everything routes through
+this client.
+
+**Session persistence (`AuthContext.jsx`):** a single `useQuery(['currentUser'],
+() => api.get('/auth/me'), { retry: false })` run once on app load, exposed via
+a `useAuth()` hook. `retry: false` is deliberate here specifically — a 401
+means "not logged in," an expected outcome, not a failure to retry past.
+`logout()` calls the backend, then manually clears the cached user via
+`queryClient.setQueryData(['currentUser'], null)`, since nothing else would
+trigger a re-fetch after the server-side cookie is cleared.
+
+**Response shapes are not uniform across the backend, confirmed the hard
+way:** products and orders return `{total, limit, offset, items}`; cart and
+reviews return bare shapes (cart: `{id, user_id, items, subtotal}`; reviews:
+a plain array). Every new page needed the actual shape confirmed before
+writing `.map()` calls — assuming consistency across endpoints would have
+been a real, silent bug source.
+
+**Two legitimate strategies for updating the query cache after a mutation,
+chosen by response shape, not preference:** `queryClient.setQueryData(key, data)`
+when the mutation's response already *is* the full fresh resource (cart
+mutations, order cancel — the endpoint returns the whole updated object);
+`queryClient.invalidateQueries({ queryKey: key })` when the response is only
+a *piece* of what the query needs (creating one review, but the query holds
+the whole list).
+
+**Checkout flow uses a real full-page navigation, not client-side routing:**
+`window.location.href = session.checkout_url` — Stripe's checkout page lives
+on a different domain entirely, so `useNavigate()`/`<Link>` (in-app routing
+only) can't reach it.
+
+**`useParams()` vs `useSearchParams()`, used deliberately for different URL
+shapes:** path segments (`/products/:id`) use `useParams()`; Stripe's redirect
+query string (`?session_id=...`) uses `useSearchParams()` — genuinely
+different hooks for genuinely different URL structures.
+
+**UI state derived from the query cache directly, not duplicated into local
+state:** e.g. `canCancel = order.status === 'pending' || order.status === 'paid'`
+computed fresh on every render from the cached order data, rather than
+tracked as separate `useState` that would need manual syncing after a
+successful cancel mutation.
+
+**Leave-a-review form is always shown**, with eligibility enforced entirely
+by the backend's 403 — the frontend just surfaces whatever error comes back,
+the same "backend is the source of truth" approach used for add-to-cart.
+
+Full flow verified end-to-end with real browser/DevTools evidence at every
+step (session persistence surviving a refresh, a genuine Stripe test-mode
+payment flipping an order to `paid` via the real webhook listener, edit/delete
+on a review working and the list correctly falling back to "No reviews yet."
+after deletion) — no step taken on faith.
+
+**Known gaps, carried forward as deliberate scope decisions:** no automated
+frontend tests yet (closed in Week 8, Day 40); no pagination UI controls
+anywhere (`limit`/`offset` hardcoded, only page 1 ever shown); the cart
+quantity input fires a mutation on every keystroke with no debounce.
+
+
+
+
+## Week 8 — Test Coverage & Real Bug Fixes (Days 36–38b)
+
+**Day 36 — Reviews pytest suite, and a real gap found by writing tests:**
+Reviewing the Reviews module's own code while writing tests surfaced something
+the manual Postman testing never caught: nothing prevented a user with
+multiple paid orders for the same product from leaving unlimited reviews.
+Fixed with `UniqueConstraint('user_id', 'product_id')` on `Review` and a new
+`DuplicateReviewError` → 409, checked query-first (consistent with the
+existing `has_verified_purchase` style) rather than caught via
+`IntegrityError`. Real process bug alongside the code bug: the Alembic
+migration file for this constraint was initially committed *separately* from
+the model change that required it — a fresh clone in between those two
+commits would have had model/DB drift. 12 tests written; diagnosed a
+`ModuleNotFoundError: No module named 'app'` down to running bare `pytest`
+instead of `python -m pytest` — the bare console script doesn't add the
+current directory to `sys.path`.
+
+**Day 37 — Redis cache pytest coverage:** Confirmed the cache-aside logic
+actually lives in `products/router.py`, not `service.py` as first assumed —
+worth checking before writing tests against an assumed location. Found and
+fixed a real test-isolation gap: cache tests had no cleanup and were sharing
+the dev Redis instance with no reset between runs, fixed via a module-scoped
+`autouse` fixture calling `invalidate_pattern()` before and after each test
+in that file specifically (not globally, to avoid unrelated blast radius).
+The most important test here doesn't just check the response is correct —
+it proves the cache is actually being *used*: `unittest.mock.patch` on the
+real DB-query function with `side_effect` set to the real implementation,
+then asserting `call_count == 1` across two identical requests. A response
+could look correct even with completely broken caching if the assertion only
+checked the data, not how many times the DB was actually hit.
+
+Caught a subtle Python trap mid-session: a duplicate test function
+definition silently shadowed an earlier, broken draft — Python allows
+redefining a function with no error or warning, so the broken version was
+never actually the code path running, despite appearing to be tested.
+
+**Day 38a — Category cycle detection:** Live-reproduced the actual
+vulnerability before writing any fix — built a real 3-level category chain
+via curl, then set the top category's parent to its own descendant, which
+succeeded with a `200 OK` and created a genuine infinite loop in the live
+database. `would_create_cycle()` walks the ancestor chain from a proposed new
+parent; if it ever reaches the category being updated, the reparent is
+rejected with a new `CategoryCycleError` → 400. Scope extended mid-session,
+deliberately, to also validate that a given `parent_id` actually exists
+(previously failed silently until a raw `IntegrityError`/500 at commit).
+Real bug during the fix itself: a new exception was imported from the wrong
+module in `router.py`, crash-looping the whole backend container on every
+reload — diagnosed via `docker compose logs backend` after curl requests
+mysteriously hung with no output at all (the hang meant no server was
+running, not a client-side issue).
+
+**Day 38b — Refresh token revocation:** Design chosen and explained before
+coding: a Redis-backed denylist keyed by each token's unique `jti` claim,
+with the Redis key's TTL set to the token's *actual remaining lifetime*
+(computed from its real `exp`), so denylist entries expire themselves with
+no cleanup job needed — chosen specifically over a DB table, which would need
+manual/background pruning of now-irrelevant expired rows. `/refresh` checks
+the denylist via `.get("jti")`, not `["jti"]`, so pre-existing tokens issued
+before this fix (which have no `jti` at all) don't crash, they just skip the
+check and remain unrevocable until they naturally expire — an accepted,
+temporary gap. `/logout` now decodes the refresh cookie *before* deleting it
+and revokes it, wrapped in try/except so an already-invalid token never
+breaks logout itself. Real bug: `/logout` used `datetime.fromtimestamp(...)`
+with `datetime`/`timezone` never imported in that file, causing a `500` on
+every logout attempt — only visible via `docker compose logs backend`, not
+the API response. Full scenario live-proved via curl with a cookie jar file:
+login → logout → refresh with the same cookies → correctly rejected `401`
+(previously would have succeeded); negative control confirmed login → refresh
+without logout still works normally.
+
+**Test suite status after Days 36–38b:** 64 tests passing (Week 7 baseline 51
++ reviews 12 net + cache 6 + category hierarchy 4 + token revocation 3 = 76
+gross written, 64 net after the reviews dedup noted in known gaps below).
+
+
+
+## Week 8 — CI Pipelines (Days 39–40)
+
+**Day 39 — GitHub Actions CI (backend):** Built incrementally, each step
+proven before adding the next, rather than writing the full config at once:
+a trivial one-step workflow first, to confirm the push/PR trigger actually
+fires and to learn to read a run's logs in GitHub's UI; then Postgres and
+Redis added as **service containers** — genuinely different from
+`docker-compose.yml` syntax, but the same underlying idea (GitHub starts them
+before the job's steps run, reachable at `localhost:<port>`), with
+`--health-cmd pg_isready` / `redis-cli ping` health checks so the job's steps
+don't race against a container that's technically "started" but not yet
+actually accepting connections; then real `pip install` + `alembic upgrade
+head` against the CI Postgres, proving the entire migration history (Day 5's
+first `User` table through Day 38's fixes) builds a correct schema from
+nothing; then the full pytest suite.
+
+**Real bug found and fixed via CI, not local testing:** `conftest.py`
+unconditionally overwrote `DATABASE_URL` with the local machine's hardcoded
+port (`5433`, the Windows-Postgres-conflict workaround) and password — this
+silently broke on any environment but the original dev machine, since CI's
+Postgres runs on the standard `5432` with different credentials entirely.
+Every one of the 64 tests failed identically with a connection error to the
+wrong port — a single root cause producing 64 apparent failures, not 64
+separate bugs. Fixed with `os.environ.setdefault(...)` instead of a direct
+assignment — respects an already-set environment variable (as CI provides)
+and only falls back to the local default when nothing else set it first. A
+genuine, permanent improvement to the test suite's portability, not a
+CI-only hack.
+
+Both `backend-tests.yml` and (once it existed) `frontend-tests.yml` were
+scoped with `paths:` filters (`backend/**` / `frontend/**` respectively)
+after noticing, live, that an unscoped backend workflow was needlessly
+re-running the entire 64-test suite on every frontend-only commit.
+
+**Day 40 — Vitest + React Testing Library (frontend):** Chose `jsdom` +
+plain `vi.mock()` over MSW for mocking API calls — simpler to reason about
+while learning the framework for the first time, at the cost of being a less
+realistic simulation of real network behavior. Built a shared
+`renderWithProviders()` test utility wrapping every rendered component in
+both `QueryClientProvider` (a **fresh** `QueryClient` per render, with
+`retry: false` — retry delays would make tests slow for no benefit since the
+API is mocked anyway) and `BrowserRouter`, after deliberately seeing the raw
+`useNavigate() may be used only in the context of a <Router> component` crash
+once, unwrapped, to understand why the wrapper is necessary rather than
+treating it as boilerplate copied from a tutorial.
+
+Three real tests written: Login submits the correct credentials to the
+correct endpoint; Register submits and redirects to `/login` specifically
+(not auto-login, matching the Day 33 design decision — a test that would
+catch someone later "fixing" the redirect to `/` by mistake); Cart's checkout
+mutation chains two `api.post` calls in the correct order with the correct
+arguments (`mockResolvedValueOnce().mockResolvedValueOnce()`, since the same
+mock function returns two different values across two calls) and sets
+`window.location.href` to the real session URL — `window.location` itself
+had to be deleted and replaced with a plain mutable object, since jsdom
+doesn't implement real navigation and the built-in property is normally
+read-only.
+
+**Real infrastructure bug found and fixed along the way:** a stray
+`node_modules/` folder appeared at the *repo root* (not `frontend/`) after a
+command was accidentally run from the wrong directory — and `.gitignore` had
+no `node_modules/` entry at all, since it had only ever been written from the
+backend/Python side of the project. Fixed both the immediate folder (deleted)
+and the actual gap (`node_modules/` and `dist/` added to `.gitignore`,
+unscoped so the pattern matches at any depth, not just `frontend/`) — a
+narrower fix that only ignored `frontend/node_modules/` would have left the
+same class of accident possible anywhere else in the repo.
+
+**CI status:** two independent GitHub Actions workflows, each triggered only
+by changes to their respective half of the codebase — `backend-tests.yml`
+(64 pytest tests against real Postgres + Redis service containers) and
+`frontend-tests.yml` (5 Vitest tests, no service containers needed since
+every API call is mocked at the module level).
+
+
+---
+
+## Project Status
+
+40/40 planned days complete. Backend (auth, catalog, cart, orders, payments,
+reviews) and frontend (full React UI across every module) are both built,
+tested, and covered by independent CI pipelines that run on every push and
+PR. See [`README.md`](../README.md) for setup instructions and a feature
+summary; this document remains the place for *why* things are built the way
+they are, not just *what* exists.
