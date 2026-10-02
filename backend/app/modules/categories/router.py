@@ -8,11 +8,13 @@ from app.modules.categories.service import get_all_categories, get_category_by_i
 from app.modules.categories.schemas import CategoryUpdate
 from app.modules.categories.service import update_category, CategoryCycleError, ParentCategoryNotFoundError
 from app.modules.categories.service import delete_category, CategoryHasChildrenError
+from app.modules.auth.dependencies import require_admin
+from app.modules.users.models import User
 
 router = APIRouter(prefix="/categories", tags=["categories"])
 
 @router.post("/", response_model=CategoryResponse, status_code=status.HTTP_201_CREATED)
-async def create(category_data: CategoryCreate, db: AsyncSession = Depends(get_db)):
+async def create(category_data: CategoryCreate, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_admin)):
     try:
         new_category = await create_category(db, category_data)
     except SlugAlreadyExistsError:
@@ -31,7 +33,7 @@ async def get_category(category_id: uuid.UUID, db: AsyncSession = Depends(get_db
     return category
 
 @router.put("/{category_id}", response_model=CategoryResponse)
-async def update(category_id: uuid.UUID, update_data: CategoryUpdate, db: AsyncSession = Depends(get_db)):
+async def update(category_id: uuid.UUID, update_data: CategoryUpdate, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_admin)):
     category = await get_category_by_id(db, category_id)
     if category is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Category not found")
@@ -54,7 +56,7 @@ async def update(category_id: uuid.UUID, update_data: CategoryUpdate, db: AsyncS
 
 
 @router.delete("/{category_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete(category_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+async def delete(category_id: uuid.UUID, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_admin)):
     category = await get_category_by_id(db, category_id)
     if category is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Category not found")

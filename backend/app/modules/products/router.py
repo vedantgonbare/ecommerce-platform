@@ -3,6 +3,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.session import get_db
 from app.modules.products.schemas import ProductCreate, ProductResponse, ProductUpdate, ProductListResponse
 from app.core.redis import redis_client
+from app.modules.auth.dependencies import require_admin
+from app.modules.users.models import User
 from app.modules.products.service import (
     create_product,
     CategoryNotFoundError,
@@ -18,7 +20,11 @@ import uuid
 router = APIRouter(prefix="/products", tags=["products"])
 
 @router.post("/", response_model=ProductResponse, status_code=status.HTTP_201_CREATED)        #create
-async def create(product_data: ProductCreate, db: AsyncSession = Depends(get_db)):
+async def create(
+    product_data: ProductCreate, 
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_admin)
+):
     try:
         new_product = await create_product(db, product_data)
     except CategoryNotFoundError:
@@ -64,7 +70,7 @@ async def get_product(product_id: uuid.UUID, db: AsyncSession = Depends(get_db))
     return product
 
 @router.put("/{product_id}", response_model=ProductResponse)
-async def update(product_id: uuid.UUID, update_data: ProductUpdate, db: AsyncSession = Depends(get_db)):
+async def update(product_id: uuid.UUID, update_data: ProductUpdate, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_admin)):
     try:
         updated_product = await update_product(db, product_id, update_data)
     except ProductNotFoundError:
@@ -75,7 +81,7 @@ async def update(product_id: uuid.UUID, update_data: ProductUpdate, db: AsyncSes
 
 
 @router.delete("/{product_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete(product_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+async def delete(product_id: uuid.UUID, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_admin)):
     try:
         await delete_product(db, product_id)
     except ProductNotFoundError:
