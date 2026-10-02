@@ -1,17 +1,12 @@
 from fastapi import Depends, HTTPException, status, Request
-
 from jose import jwt, JWTError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 import uuid
-
 from app.core.config import settings
 from app.db.session import get_db
 from app.modules.auth.security import ALGORITHM
 from app.modules.users.models import User
-
-
-
 
 async def get_current_user(
     request: Request,
