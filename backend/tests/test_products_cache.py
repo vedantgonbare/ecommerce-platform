@@ -15,14 +15,14 @@ async def clear_products_cache():
     await invalidate_pattern("products:list:*")
 
 @pytest_asyncio.fixture
-async def product_with_category(client):
+async def product_with_category(admin_client):
     """Creates a fresh category + product for cache tests, returns both ids."""
-    category_response = await client.post("/categories/", json={
+    category_response = await admin_client.post("/categories/", json={
         "name": f"Cache Test Category {uuid.uuid4().hex[:8]}"
     })
     category_id = category_response.json()["id"]
 
-    product_response = await client.post("/products/", json={
+    product_response = await admin_client.post("/products/", json={
         "name": f"Cache Test Product {uuid.uuid4().hex[:8]}",
         "price": "25.00",
         "stock_quantity": 100,
@@ -64,19 +64,17 @@ async def test_list_products_cache_hit_skips_db(client, product_with_category):
 
 
 @pytest.mark.asyncio
-async def test_create_product_invalidates_cache(client, product_with_category):
+async def test_create_product_invalidates_cache(client, admin_client, product_with_category):
     category_id = product_with_category["category_id"]
     cache_key = f"products:list:limit=20:offset=0:category_id={category_id}"
 
     from app.core.redis import redis_client
 
-    # populate the cache first
     response = await client.get(f"/products/?category_id={category_id}")
     assert response.status_code == 200
     assert await redis_client.get(cache_key) is not None  # sanity check: cache is warm
 
-    # creating a new product in the same category should invalidate the listing cache
-    await client.post("/products/", json={
+    await admin_client.post("/products/", json={
         "name": f"New Product {uuid.uuid4().hex[:8]}",
         "price": "30.00",
         "stock_quantity": 50,
@@ -87,7 +85,7 @@ async def test_create_product_invalidates_cache(client, product_with_category):
 
 
 @pytest.mark.asyncio
-async def test_update_product_invalidates_cache(client, product_with_category):
+async def test_update_product_invalidates_cache(client, admin_client, product_with_category):
     category_id = product_with_category["category_id"]
     product_id = product_with_category["product_id"]
     cache_key = f"products:list:limit=20:offset=0:category_id={category_id}"
@@ -98,13 +96,13 @@ async def test_update_product_invalidates_cache(client, product_with_category):
     assert response.status_code == 200
     assert await redis_client.get(cache_key) is not None  # sanity check: cache is warm
 
-    await client.put(f"/products/{product_id}", json={"price": "40.00"})
+    await admin_client.put(f"/products/{product_id}", json={"price": "40.00"})
 
     assert await redis_client.get(cache_key) is None
 
 
 @pytest.mark.asyncio
-async def test_delete_product_invalidates_cache(client, product_with_category):
+async def test_delete_product_invalidates_cache(client, admin_client, product_with_category):
     category_id = product_with_category["category_id"]
     product_id = product_with_category["product_id"]
     cache_key = f"products:list:limit=20:offset=0:category_id={category_id}"
@@ -115,7 +113,7 @@ async def test_delete_product_invalidates_cache(client, product_with_category):
     assert response.status_code == 200
     assert await redis_client.get(cache_key) is not None  # sanity check: cache is warm
 
-    await client.delete(f"/products/{product_id}")
+    await admin_client.delete(f"/products/{product_id}")
 
     assert await redis_client.get(cache_key) is None
 

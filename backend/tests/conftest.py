@@ -14,6 +14,7 @@ from app.db.session import get_db
 import uuid
 from app.core.celery_app import celery_app
 from app.modules.payments.service import mark_order_paid
+from sqlalchemy import select
 
 celery_app.conf.task_always_eager = True
 celery_app.conf.task_eager_propagates = True
@@ -55,15 +56,44 @@ async def auth_headers(client):
 
     return {}
 
+
 @pytest_asyncio.fixture
-async def test_product(client):
-    """Creates a fresh category + product for a single test and returns the product's id (str)."""
-    category_response = await client.post("/categories/", json={
+async def admin_client():
+    """Registers a throwaway user, promotes them to admin directly via the
+    DB (there's no API endpoint for this — same as how a real admin would
+    be bootstrapped), and logs them in on their own dedicated AsyncClient —
+    kept separate from the shared `client` fixture so creating/using this
+    admin session never clobbers whichever regular user's session an
+    individual test has already established on `client`."""
+    email = f"admin_{uuid.uuid4().hex[:8]}@example.com"
+    password = "SecurePass123!"
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        await ac.post("/auth/register", json={"email": email, "password": password})
+
+        async with async_session_factory() as session:
+            result = await session.execute(select(User).where(User.email == email))
+            user = result.scalar_one()
+            user.is_admin = True
+            await session.commit()
+
+        await ac.post("/auth/login", json={"email": email, "password": password})
+        yield ac
+
+
+@pytest_asyncio.fixture
+async def test_product(admin_client):
+    """Creates a fresh category + product for a single test and returns the
+    product's id (str). Uses the isolated admin_client, not the shared
+    `client`, since creating products/categories now requires admin — this
+    keeps whichever user the test itself logged in on `client` untouched."""
+    category_response = await admin_client.post("/categories/", json={
         "name": f"Test Category {uuid.uuid4().hex[:8]}"
     })
     category_id = category_response.json()["id"]
 
-    product_response = await client.post("/products/", json={
+    product_response = await admin_client.post("/products/", json={
         "name": f"Test Product {uuid.uuid4().hex[:8]}",
         "price": "25.00",
         "stock_quantity": 100,

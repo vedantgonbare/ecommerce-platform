@@ -5,17 +5,17 @@ from decimal import Decimal
 
 
 @pytest_asyncio.fixture
-async def test_category(client):
+async def test_category(admin_client):
     """Creates a fresh category for a single test and returns its id (str)."""
-    response = await client.post("/categories/", json={
+    response = await admin_client.post("/categories/", json={
         "name": f"Test Category {uuid.uuid4().hex[:8]}"
     })
     assert response.status_code == 201
     return response.json()["id"]
 
 @pytest.mark.asyncio
-async def test_create_product_success(client, test_category):
-    response = await client.post("/products/", json={
+async def test_create_product_success(admin_client, test_category):
+    response = await admin_client.post("/products/", json={
         "name": "Wireless Mouse",
         "description": "Ergonomic wireless mouse",
         "price": "29.99",
@@ -32,10 +32,10 @@ async def test_create_product_success(client, test_category):
 
 
 @pytest.mark.asyncio
-async def test_create_product_bad_category(client):
+async def test_create_product_bad_category(admin_client):
     fake_category_id = str(uuid.uuid4())
 
-    response = await client.post("/products/", json={
+    response = await admin_client.post("/products/", json={
         "name": "Orphan Product",
         "price": "10.00",
         "stock_quantity": 5,
@@ -45,8 +45,8 @@ async def test_create_product_bad_category(client):
     assert response.status_code == 400
 
 @pytest.mark.asyncio
-async def test_get_product_success(client, test_category):
-    create_response = await client.post("/products/", json={
+async def test_get_product_success(admin_client, client, test_category):
+    create_response = await admin_client.post("/products/", json={
         "name": "Keyboard",
         "price": "49.99",
         "stock_quantity": 20,
@@ -72,8 +72,8 @@ async def test_get_product_not_found(client):
 
 
 @pytest.mark.asyncio
-async def test_update_product_partial(client, test_category):
-    create_response = await client.post("/products/", json={
+async def test_update_product_partial(admin_client, test_category):
+    create_response = await admin_client.post("/products/", json={
         "name": "Monitor",
         "description": "24-inch monitor",
         "price": "199.99",
@@ -82,21 +82,20 @@ async def test_update_product_partial(client, test_category):
     })
     product_id = create_response.json()["id"]
 
-    response = await client.put(f"/products/{product_id}", json={
+    response = await admin_client.put(f"/products/{product_id}", json={
         "stock_quantity": 15
     })
 
     assert response.status_code == 200
     data = response.json()
     assert data["stock_quantity"] == 15
-    # Untouched fields must survive the partial update
     assert data["name"] == "Monitor"
     assert data["description"] == "24-inch monitor"
     assert data["price"] == "199.99"
 
 @pytest.mark.asyncio
-async def test_update_product_zero_value(client, test_category):
-    create_response = await client.post("/products/", json={
+async def test_update_product_zero_value(admin_client, test_category):
+    create_response = await admin_client.post("/products/", json={
         "name": "Clearance Item",
         "price": "5.00",
         "stock_quantity": 100,
@@ -104,7 +103,7 @@ async def test_update_product_zero_value(client, test_category):
     })
     product_id = create_response.json()["id"]
 
-    response = await client.put(f"/products/{product_id}", json={
+    response = await admin_client.put(f"/products/{product_id}", json={
         "price": "0.00",
         "stock_quantity": 0
     })
@@ -116,8 +115,8 @@ async def test_update_product_zero_value(client, test_category):
 
 
 @pytest.mark.asyncio
-async def test_delete_product(client, test_category):
-    create_response = await client.post("/products/", json={
+async def test_delete_product(admin_client, test_category):
+    create_response = await admin_client.post("/products/", json={
         "name": "Discontinued Widget",
         "price": "12.00",
         "stock_quantity": 3,
@@ -125,16 +124,16 @@ async def test_delete_product(client, test_category):
     })
     product_id = create_response.json()["id"]
 
-    first_delete = await client.delete(f"/products/{product_id}")
+    first_delete = await admin_client.delete(f"/products/{product_id}")
     assert first_delete.status_code == 204
 
-    second_delete = await client.delete(f"/products/{product_id}")
+    second_delete = await admin_client.delete(f"/products/{product_id}")
     assert second_delete.status_code == 404
 
 @pytest.mark.asyncio
-async def test_search_products_with_results(client, test_category):
+async def test_search_products_with_results(admin_client, client, test_category):
     unique_word = uuid.uuid4().hex[:8]
-    await client.post("/products/", json={
+    await admin_client.post("/products/", json={
         "name": f"Bluetooth Speaker {unique_word}",
         "price": "39.99",
         "stock_quantity": 10,
@@ -157,9 +156,9 @@ async def test_search_products_empty(client):
     assert response.json() == []
 
 @pytest.mark.asyncio
-async def test_pagination(client, test_category):
+async def test_pagination(admin_client, client, test_category):
     for i in range(3):
-        await client.post("/products/", json={
+        await admin_client.post("/products/", json={
             "name": f"Pagination Item {i} {uuid.uuid4().hex[:6]}",
             "price": "10.00",
             "stock_quantity": 1,
@@ -181,19 +180,19 @@ async def test_pagination(client, test_category):
 
 
 @pytest.mark.asyncio
-async def test_filter_by_category(client, test_category):
-    other_category_resp = await client.post("/categories/", json={
+async def test_filter_by_category(admin_client, client, test_category):
+    other_category_resp = await admin_client.post("/categories/", json={
         "name": f"Other Category {uuid.uuid4().hex[:8]}"
     })
     other_category_id = other_category_resp.json()["id"]
 
-    await client.post("/products/", json={
+    await admin_client.post("/products/", json={
         "name": f"In Test Category {uuid.uuid4().hex[:6]}",
         "price": "10.00",
         "stock_quantity": 1,
         "category_id": test_category
     })
-    await client.post("/products/", json={
+    await admin_client.post("/products/", json={
         "name": f"In Other Category {uuid.uuid4().hex[:6]}",
         "price": "10.00",
         "stock_quantity": 1,
