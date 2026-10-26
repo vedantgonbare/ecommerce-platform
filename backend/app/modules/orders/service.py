@@ -1,16 +1,13 @@
 import uuid
 from decimal import Decimal
-
 from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from app.modules.cart.models import CartItem
 from app.modules.cart.service import get_or_create_cart
 from app.modules.products.models import Product
 from app.modules.orders.models import Order, OrderItem, OrderStatus
 from app.modules.orders.tasks import send_order_confirmation
-
 
 class EmptyCartError(Exception):
     pass
@@ -104,12 +101,22 @@ async def list_orders(db: AsyncSession, user_id: uuid.UUID, limit: int = 20, off
     return total, orders
 
 
-async def get_order_or_404(db: AsyncSession, user_id: uuid.UUID, order_id: uuid.UUID) -> Order:
-    result = await db.execute(
+async def get_order_or_404(
+    db: AsyncSession,
+    user_id: uuid.UUID,
+    order_id: uuid.UUID,
+    *,
+    for_update: bool = False,
+) -> Order:
+    query = (
         select(Order)
         .options(selectinload(Order.items))
         .where(Order.id == order_id, Order.user_id == user_id)
     )
+    if for_update:
+        query = query.with_for_update(of=Order)
+
+    result = await db.execute(query)
     order = result.scalar_one_or_none()
     if order is None:
         raise OrderNotFoundError()
@@ -117,11 +124,24 @@ async def get_order_or_404(db: AsyncSession, user_id: uuid.UUID, order_id: uuid.
 
 
 async def cancel_order(db: AsyncSession, user_id: uuid.UUID, order_id: uuid.UUID) -> Order:
-    order = await get_order_or_404(db, user_id, order_id)
+    # 1. Lock the ORDER row first, so a double-click's second request waits here
+    order = await get_order_or_404(db, user_id, order_id, for_update=True)
 
-    if order.status not in (OrderStatus.PENDING, OrderStatus.PAID):
+    # 2. Only PENDING orders can be cancelled (no refund logic exists for PAID)
+    if order.status != OrderStatus.PENDING:
         raise InvalidStatusTransitionError(order.status)
 
+    # 3. Restore stock, locking products in a fixed order (sorted by product_id)
+    for item in sorted(order.items, key=lambda i: i.product_id):
+        product_result = await db.execute(
+            select(Product).where(Product.id == item.product_id).with_for_update()
+        )
+        product = product_result.scalar_one_or_none()
+        if product is None:
+            raise ValueError(f"Product {item.product_id} missing for order {order.id}")
+        product.stock_quantity += item.quantity
+
+    # 4. One commit for the whole transaction
     order.status = OrderStatus.CANCELLED
     await db.commit()
     await db.refresh(order, attribute_names=["items"])
