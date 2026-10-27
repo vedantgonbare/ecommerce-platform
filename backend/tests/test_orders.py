@@ -121,3 +121,46 @@ async def test_cancel_order_already_cancelled(client, auth_headers, order_from_c
     await client.patch(f"/orders/{order_from_cart['id']}/cancel", headers=auth_headers)
     response = await client.patch(f"/orders/{order_from_cart['id']}/cancel", headers=auth_headers)
     assert response.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_cancel_order_restores_stock(client, auth_headers, test_product, order_from_cart):
+    # order_from_cart already reserved 2 units, so read stock AFTER the order exists
+    after_order = await client.get(f"/products/{test_product}")
+    stock_after_order = after_order.json()["stock_quantity"]
+
+    response = await client.patch(f"/orders/{order_from_cart['id']}/cancel", headers=auth_headers)
+    assert response.status_code == 200
+
+    after_cancel = await client.get(f"/products/{test_product}")
+    assert after_cancel.json()["stock_quantity"] == stock_after_order + 2
+
+
+@pytest.mark.asyncio
+async def test_cancel_order_twice_does_not_restore_stock_twice(
+    client, auth_headers, test_product, order_from_cart
+):
+    await client.patch(f"/orders/{order_from_cart['id']}/cancel", headers=auth_headers)
+    after_first = await client.get(f"/products/{test_product}")
+    stock_after_first = after_first.json()["stock_quantity"]
+
+    second = await client.patch(f"/orders/{order_from_cart['id']}/cancel", headers=auth_headers)
+    assert second.status_code == 409
+
+    after_second = await client.get(f"/products/{test_product}")
+    assert after_second.json()["stock_quantity"] == stock_after_first
+
+
+@pytest.mark.asyncio
+async def test_cancel_paid_order_returns_409(client, auth_headers, test_product, paid_order):
+    before = await client.get(f"/products/{test_product}")
+    stock_before = before.json()["stock_quantity"]
+
+    response = await client.patch(f"/orders/{paid_order}/cancel", headers=auth_headers)
+    assert response.status_code == 409
+
+    # order stays paid and stock is untouched
+    order = await client.get(f"/orders/{paid_order}", headers=auth_headers)
+    assert order.json()["status"] == "paid"
+    after = await client.get(f"/products/{test_product}")
+    assert after.json()["stock_quantity"] == stock_before
