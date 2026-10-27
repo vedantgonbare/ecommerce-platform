@@ -20,8 +20,7 @@ function OrderDetail() {
     if (isLoading) return <p className="p-8">Loading order...</p>
   if (error) return <p className="p-8 text-red-600">Failed to load order: {error.message}</p>
 
-  const canCancel = order.status === 'pending' || order.status === 'paid'
-
+  const canCancel = order.status === 'pending'
   return (
     <div className="p-8 max-w-2xl">
       <Link to="/orders" className="text-blue-600 underline text-sm">← Back to orders</Link>
