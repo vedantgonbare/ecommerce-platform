@@ -1,5 +1,7 @@
 import uuid
 from unittest.mock import patch, MagicMock
+from app.db.session import async_session_factory
+from app.modules.payments.service import mark_order_paid
 
 import pytest
 
@@ -96,3 +98,27 @@ async def test_payment_success_unknown_session_returns_404(client):
     )
 
     assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_mark_order_paid_twice_queues_task_once(pending_order):
+    with patch("app.modules.payments.service.send_payment_confirmation") as mock_task:
+        async with async_session_factory() as session:
+            await mark_order_paid(session, pending_order)
+        async with async_session_factory() as session:
+            await mark_order_paid(session, pending_order)
+
+    assert mock_task.delay.call_count == 1
+
+
+@pytest.mark.asyncio
+async def test_mark_order_paid_does_not_flip_cancelled_order(client, auth_headers, pending_order):
+    await client.patch(f"/orders/{pending_order}/cancel", headers=auth_headers)
+
+    with patch("app.modules.payments.service.send_payment_confirmation") as mock_task:
+        async with async_session_factory() as session:
+            await mark_order_paid(session, pending_order)
+
+    order = await client.get(f"/orders/{pending_order}", headers=auth_headers)
+    assert order.json()["status"] == "cancelled"
+    mock_task.delay.assert_not_called()
