@@ -27,7 +27,7 @@ async def create_order_from_cart(db: AsyncSession, user_id: uuid.UUID) -> Order:
     cart = await get_or_create_cart(db, user_id)
 
     result = await db.execute(select(CartItem).where(CartItem.cart_id == cart.id))
-    cart_items = result.scalars().all()
+    cart_items = sorted(result.scalars().all(), key=lambda c: c.product_id)
 
     if not cart_items:
         raise EmptyCartError()
