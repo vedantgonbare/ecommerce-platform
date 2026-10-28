@@ -6,6 +6,7 @@ from sqlalchemy.orm import selectinload
 from sqlalchemy import select
 from app.modules.orders.models import Order, OrderStatus
 from app.modules.payments.tasks import send_payment_confirmation
+import logging
 
 async def create_checkout_session(
     db: AsyncSession, user_id: uuid.UUID, order_id: uuid.UUID
@@ -40,13 +41,26 @@ async def create_checkout_session(
 
     return session.url, session.id
 
+logger = logging.getLogger(__name__)
 
 async def mark_order_paid(db: AsyncSession, order_id: str) -> None:
-    result = await db.execute(select(Order).where(Order.id == order_id))
+    result = await db.execute(
+        select(Order).where(Order.id == order_id).with_for_update()
+    )
     order = result.scalar_one_or_none()
 
     if order is None:
-        return  # unknown order_id — nothing to update, silently ignore
+        return  # unknown order_id, nothing to update
+
+    if order.status == OrderStatus.PAID:
+        return  # duplicate webhook delivery, already handled
+
+    if order.status != OrderStatus.PENDING:
+        logger.warning(
+            "Payment received for order %s in status %s; needs manual review/refund",
+            order_id, order.status.value,
+        )
+        return
 
     order.status = OrderStatus.PAID
     await db.commit()
