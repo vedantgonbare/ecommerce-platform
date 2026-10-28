@@ -164,3 +164,37 @@ async def test_cancel_paid_order_returns_409(client, auth_headers, test_product,
     assert order.json()["status"] == "paid"
     after = await client.get(f"/products/{test_product}")
     assert after.json()["stock_quantity"] == stock_before
+
+
+@pytest.mark.asyncio
+async def test_create_order_with_multiple_products_decrements_each(
+    client, auth_headers, admin_client, test_product
+):
+    # test_product gives us product A; create a second product B with its own category
+    category = await admin_client.post("/categories/", json={
+        "name": f"Test Category {uuid.uuid4().hex[:8]}"
+    })
+    second = await admin_client.post("/products/", json={
+        "name": f"Test Product {uuid.uuid4().hex[:8]}",
+        "price": "10.00",
+        "stock_quantity": 50,
+        "category_id": category.json()["id"],
+    })
+    second_id = second.json()["id"]
+
+    a_before = (await client.get(f"/products/{test_product}")).json()["stock_quantity"]
+    b_before = (await client.get(f"/products/{second_id}")).json()["stock_quantity"]
+
+    await client.post("/cart/items", json={"product_id": test_product, "quantity": 3}, headers=auth_headers)
+    await client.post("/cart/items", json={"product_id": second_id, "quantity": 2}, headers=auth_headers)
+
+    response = await client.post("/orders/", headers=auth_headers)
+    assert response.status_code == 201
+    data = response.json()
+    assert len(data["items"]) == 2
+    assert data["total"] == "95.00"  # 25.00 * 3 + 10.00 * 2
+
+    a_after = (await client.get(f"/products/{test_product}")).json()["stock_quantity"]
+    b_after = (await client.get(f"/products/{second_id}")).json()["stock_quantity"]
+    assert a_after == a_before - 3
+    assert b_after == b_before - 2
