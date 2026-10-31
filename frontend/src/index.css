@@ -1,1 +1,20 @@
 @import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Merriweather", ui-serif, Georgia, serif;
+
+  --color-ink: #1f1f1f;
+  --color-ink-muted: #555555;
+  --color-hero: #5b5b60;
+  --color-surface: #f3f3f3;
+  --color-line: #e5e5e5;
+
+  --color-tan: #b8a584;
+  --color-tan-icon: #a38f68;
+
+  --color-tile-lavender: #c9cbdc;
+  --color-tile-peach: #fdd8aa;
+  --color-tile-pink: #f9d7dc;
+  --color-tile-blue: #c8dfe5;
+}
