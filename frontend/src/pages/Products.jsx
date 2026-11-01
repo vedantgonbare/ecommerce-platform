@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { api } from '../api/client'
+import ProductImage from '../components/ProductImage'
 
 function Products() {
   const { data, isLoading, error } = useQuery({
@@ -19,16 +20,19 @@ function Products() {
           <Link
             key={product.id}
             to={`/products/${product.id}`}
-            className="border rounded p-4 hover:shadow"
+            className="block border border-line bg-white hover:shadow-md"
           >
+            <ProductImage src={product.image_url} alt={product.name} />
+            <div className="p-4">
             <h2 className="font-semibold">{product.name}</h2>
-            <p className="text-gray-600">${product.price}</p>
-            <p className="text-sm text-gray-400">
+            <p className="text-ink-mute">${product.price}</p>
+            <p className="text-sum text-ink-muted">
               {product.stock_quantity > 0
                 ? `${product.stock_quantity} in stock`
                 : 'Out of stock'}
             </p>
-          </Link>
+          </div>
+        </Link>
         ))}
       </div>
     </div>
