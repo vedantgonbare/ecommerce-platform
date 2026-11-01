@@ -204,3 +204,44 @@ async def test_filter_by_category(admin_client, client, test_category):
 
     assert data["total"] == 1
     assert data["items"][0]["category_id"] == test_category
+
+
+@pytest.mark.asyncio
+async def test_product_image_url_round_trip(client, admin_client):
+    category = await admin_client.post("/categories/", json={
+        "name": f"Test Category {uuid.uuid4().hex[:8]}"
+    })
+    created = await admin_client.post("/products/", json={
+        "name": f"Test Product {uuid.uuid4().hex[:8]}",
+        "price": "12.00",
+        "stock_quantity": 5,
+        "category_id": category.json()["id"],
+        "image_url": "/products/test.jpg",
+    })
+    assert created.status_code == 201  # use the status your create endpoint returns
+
+    fetched = await client.get(f"/products/{created.json()['id']}")
+    assert fetched.json()["image_url"] == "/products/test.jpg"
+
+
+@pytest.mark.asyncio
+async def test_product_image_url_can_be_updated(client, admin_client):
+    category = await admin_client.post("/categories/", json={
+        "name": f"Test Category {uuid.uuid4().hex[:8]}"
+    })
+    created = await admin_client.post("/products/", json={
+        "name": f"Test Product {uuid.uuid4().hex[:8]}",
+        "price": "12.00",
+        "stock_quantity": 5,
+        "category_id": category.json()["id"],
+    })
+    product_id = created.json()["id"]
+    assert created.json()["image_url"] is None
+
+    updated = await admin_client.put(f"/products/{product_id}", json={
+        "image_url": "/products/new.jpg"
+    })
+    assert updated.status_code == 200
+
+    fetched = await client.get(f"/products/{product_id}")
+    assert fetched.json()["image_url"] == "/products/new.jpg"
