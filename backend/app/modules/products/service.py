@@ -22,6 +22,7 @@ async def create_product(db: AsyncSession, product_data: ProductCreate) -> Produ
     new_product = Product(
         name=product_data.name,
         description=product_data.description,
+        image_url=product_data.image_url,
         price=product_data.price,
         stock_quantity=product_data.stock_quantity,
         category_id=product_data.category_id,
