@@ -4,7 +4,7 @@ function ProductImage({ src, alt }) {
   const [failed, setFailed] = useState(false)
 
   return (
-    <div className="aspect-[4/3] w-full overflow-hidden bg-surface">
+    <div className="aspect-4/3 w-full overflow-hidden bg-surface">
       {src && !failed && (
         <img
           src={src}

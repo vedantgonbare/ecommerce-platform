@@ -25,7 +25,7 @@ function Products() {
             <ProductImage src={product.image_url} alt={product.name} />
             <div className="p-4">
             <h2 className="font-semibold">{product.name}</h2>
-            <p className="text-ink-mute">${product.price}</p>
+            <p className="text-ink-muted">${product.price}</p>
             <p className="text-sum text-ink-muted">
               {product.stock_quantity > 0
                 ? `${product.stock_quantity} in stock`
