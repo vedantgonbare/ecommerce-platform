@@ -13,9 +13,9 @@ function Products() {
   if (error) return <p className="p-8 text-red-600">Failed to load products: {error.message}</p>
 
   return (
-    <div className="p-8">
-      <h1 className="text-2xl mb-4">Products</h1>
-      <div className="grid grid-cols-3 gap-4">
+    <div className="mx-auto max-w-6xl px-6 py-8">
+      <h1 className="mb-6 font-display text-3xl">Products</h1>
+      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
         {data.items.map((product) => (
           <Link
             key={product.id}
