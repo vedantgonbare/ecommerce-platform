@@ -1,16 +1,18 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQueryClient} from '@tanstack/react-query'
 import { api } from '../api/client'
 
 function Login() {
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
 
   const loginMutation = useMutation({
     mutationFn: (credentials) => api.post('/auth/login', credentials),
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['currentUser'] })
       navigate('/')
     },
   })
