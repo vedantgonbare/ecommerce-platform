@@ -18,12 +18,15 @@ function App() {
     const { user, isLoading, logout } = useAuth()
   return (
     <div className="p-8">
-      <nav className="flex gap-4 mb-6 items-center">
+<nav className="flex gap-4 mb-6 items-center">
   <Link to="/" className="text-blue-600 underline">Home</Link>
+  <Link to="/products" className="text-blue-600 underline">Products</Link>
   {isLoading ? (
     <span className="text-gray-400">Checking session...</span>
   ) : user ? (
     <>
+      <Link to="/cart" className="text-blue-600 underline">Cart</Link>
+      <Link to="/orders" className="text-blue-600 underline">Orders</Link>
       <span>Logged in as {user.email}</span>
       <button onClick={logout} className="text-blue-600 underline">Logout</button>
     </>
@@ -31,8 +34,6 @@ function App() {
     <>
       <Link to="/login" className="text-blue-600 underline">Login</Link>
       <Link to="/register" className="text-blue-600 underline">Register</Link>
-      <Link to="/cart" className="text-blue-600 underline">Cart</Link>
-      <Link to="/orders" className="text-blue-600 underline">Orders</Link>
     </>
   )}
 </nav>
