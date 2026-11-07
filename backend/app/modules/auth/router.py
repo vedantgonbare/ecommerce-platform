@@ -15,7 +15,7 @@ from app.modules.auth.security import create_access_token
 from app.modules.users.models import User
 from app.modules.auth.dependencies import get_current_user
 from jose import jwt, JWTError
-from app.modules.auth.security import create_access_token, create_refresh_token, ALGORITHM
+from app.modules.auth.security import create_access_token, create_refresh_token, ALGORITHM, ACCESS_TOKEN_EXPIRE_SECONDS, REFRESH_TOKEN_EXPIRE_SECONDS
 from app.core.config import settings
 from app.modules.auth.token_revocation import revoke_refresh_token, is_refresh_token_revoked
 
@@ -47,17 +47,17 @@ async def login(credentials: UserLogin, response: Response, db: AsyncSession = D
         key="access_token",
         value=access_token,
         httponly=True,
-        secure=False,
+        secure=settings.cookie_secure,
         samesite="lax",
-        max_age=60 * 30,
+        max_age=ACCESS_TOKEN_EXPIRE_SECONDS,
     )
     response.set_cookie(
         key="refresh_token",
         value=refresh_token,
         httponly=True,
-        secure=False,
+        secure=settings.cookie_secure,
         samesite="lax",
-        max_age=60 * 60 * 24 * 7,
+        max_age=REFRESH_TOKEN_EXPIRE_SECONDS,
     )
 
     return {"message": "Login successful"}
@@ -96,9 +96,9 @@ async def refresh(request: Request, response: Response):
         key="access_token",
         value=new_access_token,
         httponly=True,
-        secure=False,
+        secure=settings.cookie_secure,
         samesite="lax",
-        max_age=60 * 30,
+        max_age=ACCESS_TOKEN_EXPIRE_SECONDS,
     )
 
     return {"message": "Token refreshed"}

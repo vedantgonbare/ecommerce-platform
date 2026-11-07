@@ -8,6 +8,7 @@ class Settings(BaseSettings):
     stripe_secret_key: str
     stripe_webhook_secret: str
     frontend_url: str = "http://localhost:5173"
+    cookie_secure: bool = False
 
     class Config:
         env_file = ".env"
