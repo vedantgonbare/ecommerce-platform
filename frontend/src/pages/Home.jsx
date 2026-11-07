@@ -69,7 +69,7 @@ function Home() {
             {categories.map((category, i) => (
               <Link
                 key={category.id}
-                to="/products"
+                to={`/products?category_id=${category.id}`}
                 className={`${TILE_COLORS[i % TILE_COLORS.length]} rounded-[2px] p-6 flex items-center justify-center text-center font-semibold text-ink min-h-[100px]`}
               >
                 {category.name}
@@ -77,7 +77,7 @@ function Home() {
             ))}
           </div>
         )}
-      </section>
+      </section>    
 
       {/* Featured products */}
       <section className="mx-auto max-w-6xl px-6 py-16 bg-surface">
