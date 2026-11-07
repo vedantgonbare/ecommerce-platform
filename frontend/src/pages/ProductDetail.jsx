@@ -65,33 +65,33 @@ function ProductDetail() {
   if (productError) return <p className="p-8 text-red-600">Failed to load product: {productError.message}</p>
 
   return (
-    <div className="p-8 max-w-2xl">
-      <h1 className="text-2xl font-semibold">{product.name}</h1>
-      <p className="text-xl text-gray-600 mt-2">${product.price}</p>
-      <p className="text-sm text-gray-400 mt-1">
+    <div className="p-8 max-w-2xl mx-auto">
+      <h1 className="font-display text-2xl text-ink">{product.name}</h1>
+      <p className="text-xl text-ink-muted mt-2">${product.price}</p>
+      <p className="text-sm text-ink-muted mt-1">
         {product.stock_quantity > 0
           ? `${product.stock_quantity} in stock`
           : 'Out of stock'}
       </p>
       {product.description && (
-        <p className="mt-4 text-gray-700">{product.description}</p>
+        <p className="mt-4 text-ink">{product.description}</p>
       )}
 
-      <h2 className="text-lg font-semibold mt-8 mb-2">Reviews</h2>
+      <h2 className="font-display text-lg text-ink mt-8 mb-2">Reviews</h2>
       {reviewsLoading ? (
-        <p className="text-gray-400">Loading reviews...</p>
+        <p className="text-ink-muted">Loading reviews...</p>
       ) : reviews.length === 0 ? (
-        <p className="text-gray-400">No reviews yet.</p>
+        <p className="text-ink-muted">No reviews yet.</p>
       ) : (
         <div className="flex flex-col gap-3">
           {reviews.map((review) => (
-            <div key={review.id} className="border-b pb-2">
+            <div key={review.id} className="border-b border-line pb-2">
               {editingReviewId === review.id ? (
                 <div className="flex flex-col gap-2">
                   <select
                     value={editRating}
                     onChange={(e) => setEditRating(Number(e.target.value))}
-                    className="border rounded p-2 w-24"
+                    className="border border-line rounded-xs p-2 w-24 text-ink"
                   >
                     {[5, 4, 3, 2, 1].map((n) => (
                       <option key={n} value={n}>{n} / 5</option>
@@ -101,19 +101,19 @@ function ProductDetail() {
                     value={editComment}
                     onChange={(e) => setEditComment(e.target.value)}
                     rows={2}
-                    className="border rounded p-2"
+                    className="border border-line rounded-xs p-2 text-ink"
                   />
                   <div className="flex gap-2">
                     <button
                       onClick={() => updateReview.mutate(review.id)}
                       disabled={updateReview.isPending}
-                      className="bg-blue-600 text-white px-3 py-1 rounded text-sm disabled:opacity-50"
+                      className="bg-tan text-ink px-3 py-1 rounded-xs text-sm font-semibold disabled:opacity-50"
                     >
                       Save
                     </button>
                     <button
                       onClick={() => setEditingReviewId(null)}
-                      className="text-gray-600 text-sm underline"
+                      className="text-ink-muted text-sm underline"
                     >
                       Cancel
                     </button>
@@ -124,8 +124,8 @@ function ProductDetail() {
                 </div>
               ) : (
                 <>
-                  <p className="font-medium">{review.rating} / 5</p>
-                  {review.comment && <p className="text-gray-700">{review.comment}</p>}
+                  <p className="font-medium text-ink">{review.rating} / 5</p>
+                  {review.comment && <p className="text-ink">{review.comment}</p>}
                   {user?.id === review.user_id && (
                     <div className="flex gap-3 mt-1">
                       <button
@@ -134,7 +134,7 @@ function ProductDetail() {
                           setEditRating(review.rating)
                           setEditComment(review.comment || '')
                         }}
-                        className="text-blue-600 text-sm underline"
+                        className="text-ink text-sm underline"
                       >
                         Edit
                       </button>
@@ -157,7 +157,7 @@ function ProductDetail() {
         <button
           onClick={() => addToCart.mutate()}
           disabled={addToCart.isPending || product.stock_quantity === 0}
-          className="bg-blue-600 text-white px-4 py-2 rounded disabled:opacity-50"
+          className="bg-tan text-ink px-4 py-2 rounded-xs font-semibold disabled:opacity-50"
         >
           {addToCart.isPending ? 'Adding...' : 'Add to Cart'}
         </button>
@@ -166,8 +166,8 @@ function ProductDetail() {
         )}
       </div>
 
-      <div className="mt-8 border-t pt-6">
-        <h2 className="text-lg font-semibold mb-2">Leave a Review</h2>
+      <div className="mt-8 border-t border-line pt-6">
+        <h2 className="font-display text-lg text-ink mb-2">Leave a Review</h2>
         <form
           onSubmit={(e) => {
             e.preventDefault()
@@ -175,12 +175,12 @@ function ProductDetail() {
           }}
           className="flex flex-col gap-3 max-w-sm"
         >
-          <label className="flex flex-col gap-1">
+          <label className="flex flex-col gap-1 text-ink">
             Rating
             <select
               value={rating}
               onChange={(e) => setRating(Number(e.target.value))}
-              className="border rounded p-2"
+              className="border border-line rounded-xs p-2 text-ink"
             >
               {[5, 4, 3, 2, 1].map((n) => (
                 <option key={n} value={n}>{n} / 5</option>
@@ -188,20 +188,20 @@ function ProductDetail() {
             </select>
           </label>
 
-          <label className="flex flex-col gap-1">
+          <label className="flex flex-col gap-1 text-ink">
             Comment (optional)
             <textarea
               value={comment}
               onChange={(e) => setComment(e.target.value)}
               rows={3}
-              className="border rounded p-2"
+              className="border border-line rounded-xs p-2 text-ink"
             />
           </label>
 
           <button
             type="submit"
             disabled={submitReview.isPending}
-            className="bg-blue-600 text-white px-4 py-2 rounded disabled:opacity-50"
+            className="bg-tan text-ink px-4 py-2 rounded-xs font-semibold disabled:opacity-50"
           >
             {submitReview.isPending ? 'Submitting...' : 'Submit Review'}
           </button>
