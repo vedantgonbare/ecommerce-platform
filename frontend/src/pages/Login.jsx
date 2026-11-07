@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useMutation, useQueryClient} from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '../api/client'
 
 function Login() {
@@ -23,8 +23,8 @@ function Login() {
   }
 
   return (
-    <div className="max-w-sm mx-auto mt-8">
-      <h1 className="text-2xl font-bold mb-4">Login</h1>
+    <div className="max-w-sm mx-auto mt-16 px-6">
+      <h1 className="font-display text-2xl text-ink mb-6">Login</h1>
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-3">
         <input
@@ -33,7 +33,7 @@ function Login() {
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           required
-          className="border border-gray-300 rounded p-2"
+          className="border border-line rounded-[2px] p-2 text-ink"
         />
         <input
           type="password"
@@ -41,7 +41,7 @@ function Login() {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           required
-          className="border border-gray-300 rounded p-2"
+          className="border border-line rounded-[2px] p-2 text-ink"
         />
 
         {loginMutation.isError && (
@@ -51,7 +51,7 @@ function Login() {
         <button
           type="submit"
           disabled={loginMutation.isPending}
-          className="bg-blue-600 text-white rounded p-2 disabled:opacity-50"
+          className="bg-tan text-ink rounded-[2px] p-2 font-semibold disabled:opacity-50"
         >
           {loginMutation.isPending ? 'Logging in...' : 'Log In'}
         </button>
