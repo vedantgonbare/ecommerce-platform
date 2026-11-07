@@ -9,10 +9,8 @@ import OrderSuccess from './pages/OrderSuccess'
 import OrderCancel from './pages/OrderCancel'
 import Orders from './pages/Orders'
 import OrderDetail from './pages/OrderDetail'
+import Home from './pages/Home'
 
-function Home() {
-  return <h1>Home Page</h1>
-}
 
 function App() {
     const { user, isLoading, logout } = useAuth()
