@@ -51,14 +51,10 @@ async def list_products(
 
     return response
 
-# @router.get("/", response_model=list[ProductResponse])                                          # list_products
-# async def list_products(db: AsyncSession = Depends(get_db)):
-#     return await get_all_products(db)
-
 
 @router.get("/search", response_model=list[ProductResponse])                                        #searching                
-async def search(q: str, db: AsyncSession = Depends(get_db)):
-    return await search_products(db, q)
+async def search(q: str, limit: int = 20, offset: int = 0, db: AsyncSession = Depends(get_db)):
+    return await search_products(db, q, limit=limit, offset=offset)
 
 
 @router.get("/{product_id}", response_model=ProductResponse)                                   #get router

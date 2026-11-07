@@ -83,7 +83,9 @@ async def delete_product(db, product_id):
     await invalidate_pattern("products:list:*")
 
 
-async def search_products(db: AsyncSession, query: str) -> list[Product]:
+async def search_products(
+    db: AsyncSession, query: str, limit: int = 20, offset: int = 0
+) -> list[Product]:
     ts_query = func.plainto_tsquery("english", query)
     ts_vector = func.to_tsvector("english", Product.name)
 
@@ -91,5 +93,7 @@ async def search_products(db: AsyncSession, query: str) -> list[Product]:
         select(Product)
         .where(ts_vector.op("@@")(ts_query))
         .order_by(func.ts_rank(ts_vector, ts_query).desc())
+        .limit(limit)
+        .offset(offset)
     )
     return result.scalars().all()
