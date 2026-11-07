@@ -1,10 +1,9 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func
 from app.modules.products.models import Product
 from app.modules.products.schemas import ProductCreate, ProductUpdate
 from app.modules.categories.models import Category
 import uuid
-from sqlalchemy import select, func
 from app.core.redis import invalidate_pattern
 
 class CategoryNotFoundError(Exception):
@@ -50,10 +49,6 @@ async def get_all_products(
     items = result.scalars().all()
 
     return total, items
-
-# async def get_all_products(db: AsyncSession) -> list[Product]:
-#     result = await db.execute(select(Product))
-#     return result.scalars().all()
 
 
 async def get_product_or_404(db: AsyncSession, product_id: uuid.UUID) -> Product:
