@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     redis_url: str
     stripe_secret_key: str
     stripe_webhook_secret: str
+    frontend_url: str = "http://localhost:5173"
 
     class Config:
         env_file = ".env"

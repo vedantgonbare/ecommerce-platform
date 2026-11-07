@@ -1,3 +1,4 @@
+import logging
 import stripe
 import uuid
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -6,7 +7,10 @@ from sqlalchemy.orm import selectinload
 from sqlalchemy import select
 from app.modules.orders.models import Order, OrderStatus
 from app.modules.payments.tasks import send_payment_confirmation
-import logging
+from app.core.config import settings
+
+logger = logging.getLogger(__name__)
+
 
 async def create_checkout_session(
     db: AsyncSession, user_id: uuid.UUID, order_id: uuid.UUID
@@ -31,8 +35,8 @@ async def create_checkout_session(
     session = stripe.checkout.Session.create(
         mode="payment",
         line_items=line_items,
-        success_url="http://localhost:5173/orders/success?session_id={CHECKOUT_SESSION_ID}",
-        cancel_url="http://localhost:5173/orders/cancel",
+        success_url=f"{settings.frontend_url}/orders/success?session_id={{CHECKOUT_SESSION_ID}}",
+        cancel_url=f"{settings.frontend_url}/orders/cancel",
         metadata={"order_id": str(order.id)},
     )
 
@@ -41,7 +45,6 @@ async def create_checkout_session(
 
     return session.url, session.id
 
-logger = logging.getLogger(__name__)
 
 async def mark_order_paid(db: AsyncSession, order_id: str) -> None:
     result = await db.execute(
@@ -66,6 +69,7 @@ async def mark_order_paid(db: AsyncSession, order_id: str) -> None:
     await db.commit()
 
     send_payment_confirmation.delay(order_id)
+
 
 async def get_order_by_session_id(db: AsyncSession, session_id: str) -> Order:
     result = await db.execute(
