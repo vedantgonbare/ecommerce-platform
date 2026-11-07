@@ -29,7 +29,7 @@ function Register() {
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           required
-          className="border border-line rounded-[2px] p-2 text-ink"
+          className="border border-line rounded-xs p-2 text-ink"
         />
         <input
           type="password"
@@ -38,12 +38,12 @@ function Register() {
           onChange={(e) => setPassword(e.target.value)}
           required
           minLength={8}
-          className="border border-line rounded-[2px] p-2 text-ink"
+          className="border border-line rounded-xs p-2 text-ink"
         />
         <button
           type="submit"
           disabled={registerMutation.isPending}
-          className="bg-tan text-ink rounded-[2px] p-2 font-semibold disabled:opacity-50"
+          className="bg-tan text-ink rounded-xs p-2 font-semibold disabled:opacity-50"
         >
           {registerMutation.isPending ? 'Registering...' : 'Register'}
         </button>

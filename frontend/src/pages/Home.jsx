@@ -21,7 +21,7 @@ function Home() {
       {/* Hero */}
       <section className="relative">
         <div
-          className="h-[420px] bg-cover bg-center flex items-center"
+          className="h-105 bg-cover bg-center flex items-center"
           style={{
             backgroundImage:
               "url('https://plus.unsplash.com/premium_photo-1664201890375-f8fa405cdb7d?w=1600&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=NHwxMjA3fDA%3D')",
@@ -36,7 +36,7 @@ function Home() {
             </p>
             <Link
               to="/products"
-              className="inline-block mt-6 bg-tan text-ink px-6 py-3 rounded-[2px] font-semibold"
+              className="inline-block mt-6 bg-tan text-ink px-6 py-3 rounded-xs font-semibold"
             >
               Shop Now
             </Link>
@@ -45,7 +45,7 @@ function Home() {
 
         {/* Trust strip — overlaps hero bottom edge */}
         <div className="mx-auto max-w-5xl px-6 -mt-10 relative">
-          <div className="bg-white border border-line rounded-[2px] shadow-md grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-line">
+          <div className="bg-white border border-line rounded-xs shadow-md grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-line">
             <div className="p-5 text-center">
               <p className="font-semibold text-ink">Secure checkout (Stripe)</p>
             </div>
@@ -70,7 +70,7 @@ function Home() {
               <Link
                 key={category.id}
                 to={`/products?category_id=${category.id}`}
-                className={`${TILE_COLORS[i % TILE_COLORS.length]} rounded-[2px] p-6 flex items-center justify-center text-center font-semibold text-ink min-h-[100px]`}
+                className={`${TILE_COLORS[i % TILE_COLORS.length]} rounded-xs p-6 flex items-center justify-center text-center font-semibold text-ink min-h-25`}
               >
                 {category.name}
               </Link>
@@ -90,7 +90,7 @@ function Home() {
               <Link
                 key={product.id}
                 to={`/products/${product.id}`}
-                className="block bg-white rounded-[2px] overflow-hidden border border-line"
+                className="block bg-white rounded-xs overflow-hidden border border-line"
               >
                 <ProductImage src={product.image_url} alt={product.name} />
                 <div className="p-4">

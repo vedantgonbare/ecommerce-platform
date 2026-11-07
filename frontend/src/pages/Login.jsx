@@ -33,7 +33,7 @@ function Login() {
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           required
-          className="border border-line rounded-[2px] p-2 text-ink"
+          className="border border-line rounded-xs p-2 text-ink"
         />
         <input
           type="password"
@@ -41,7 +41,7 @@ function Login() {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           required
-          className="border border-line rounded-[2px] p-2 text-ink"
+          className="border border-line rounded-xs p-2 text-ink"
         />
 
         {loginMutation.isError && (
@@ -51,7 +51,7 @@ function Login() {
         <button
           type="submit"
           disabled={loginMutation.isPending}
-          className="bg-tan text-ink rounded-[2px] p-2 font-semibold disabled:opacity-50"
+          className="bg-tan text-ink rounded-xs p-2 font-semibold disabled:opacity-50"
         >
           {loginMutation.isPending ? 'Logging in...' : 'Log In'}
         </button>
