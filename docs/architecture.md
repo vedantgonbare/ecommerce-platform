@@ -656,3 +656,141 @@ tested, and covered by independent CI pipelines that run on every push and
 PR. See [`README.md`](../README.md) for setup instructions and a feature
 summary; this document remains the place for *why* things are built the way
 they are, not just *what* exists.
+
+
+---
+
+## Post-Launch: Security Hardening & Polish
+
+After the initial 40-day build, the project went through two further phases:
+a hardening pass prompted by an informal code review, and a design/UX pass
+adding the Homi-inspired visual system and several backend refinements.
+
+### Security hardening
+
+**Admin-only writes.** Product and category create/update/delete had no
+access control at all — anyone could modify the catalog. Added an `is_admin`
+boolean on `User` (migration needed `server_default=sa.false()`, since
+existing rows would otherwise violate `NOT NULL`) and a `require_admin`
+dependency layered on top of `get_current_user`: 401 for no session, 403 for
+a logged-in non-admin. Protecting six write endpoints broke 45 of 64 tests
+from one root cause — fixtures were creating test data without an admin
+session. Fixed with a separate `admin_client` fixture rather than mutating
+the shared one, so ordinary user-flow tests stay unaffected.
+
+**Stock not restored on cancel.** `cancel_order` previously only flipped
+`status` to `cancelled` — it never gave reserved stock back, and allowed
+cancelling `paid` orders even though nothing refunds the money. Fixed to:
+lock the order row first (`for_update=True` on the existing fetch-or-404
+helper, keeping ownership-scoping in one place), restrict cancellation to
+`pending` only (409 otherwise — a valid request conflicting with state, the
+same reasoning used elsewhere), lock and restore the affected products in
+**sorted `product_id` order** to prevent a double-cancel race, single commit
+for the whole operation. Live-proven with real before/after stock numbers,
+not just "tests pass."
+
+**Lock-order deadlock.** `create_order_from_cart` locked products in
+whatever order they happened to be in the cart — two orders containing the
+same two products in reverse order could deadlock waiting on each other's
+locks. Fixed by sorting cart items by `product_id` before the lock loop,
+same principle as the cancel-order fix above: a consistent, deterministic
+lock acquisition order across all callers is what actually prevents
+deadlock, not the locks themselves.
+
+**Webhook idempotency.** `mark_order_paid` previously set `status = PAID`
+unconditionally on every `checkout.session.completed` event — but Stripe
+can and does redeliver the same event. Fixed to: `FOR UPDATE` lookup, no-op
+on an unknown order, no-op if already `PAID` (duplicate delivery), log a
+warning without flipping status if the order isn't `PENDING` (e.g. it was
+cancelled after payment started), only transition `PENDING → PAID`. Two new
+tests prove this against the *old* code first (stashed, confirmed red, then
+restored) rather than just asserting against the fixed version.
+
+### Product images & seed data
+
+Added a nullable `image_url` on `Product`. A round-trip test caught a real
+bug: `create_product` built the ORM object field-by-field and silently
+dropped `image_url` even though it was accepted and validated by the
+Pydantic schema — a reminder that schema validation passing doesn't
+guarantee a field actually reaches the database. `update_product` worked
+correctly already, since it uses `exclude_unset` + `setattr` generically
+rather than naming fields individually.
+
+Wrote an idempotent `scripts/seed.py` — looks up each category/product by
+name and skips existing rows, calls the real `create_category`/
+`create_product` service functions (so slugs and cache invalidation behave
+normally rather than being bypassed), and refuses to run against any
+database except `ecommerce_db` as a safety guard.
+
+### Frontend design pass
+
+Restyled every page (Home, Login, Register, Products, ProductDetail, Cart,
+Orders, OrderDetail) against a shared Tailwind `@theme` token system rather
+than ad-hoc utility classes — consistent colors, a serif/sans type pairing,
+and square corners across the whole app. Built a new `Home.jsx` with a hero
+section, trust strip, category tiles linking into filtered product views,
+and a featured-products grid — all backed by real `GET /categories` and
+`GET /products` data rather than placeholder content.
+
+**Category filtering.** Product tiles link to `/products?category_id=...`,
+read via `useSearchParams()` rather than local state — consistent with the
+project's existing pattern for the Stripe success/cancel pages. The
+product list query's `queryKey` includes `categoryId` specifically so
+switching categories doesn't serve stale cached results from a previous
+filter.
+
+**Numbered pagination.** Added to both Products and Orders, computing
+`totalPages = Math.ceil(total / limit)` from the server's own count rather
+than guessing. A real scope-check worth naming honestly: the live catalog
+only has 12 products, so pagination's correctness was partly proven by
+temporarily lowering the page size during testing rather than with real
+production-scale data — the underlying logic is identical either way, but
+it's an honest limitation of what manual testing could show at this data
+volume.
+
+### Backend refinements
+
+**Configurable frontend URL.** Stripe's `success_url`/`cancel_url` were
+hardcoded to `localhost:5173` directly in `payments/service.py` — unable to
+deploy anywhere else without editing source. Moved to a `frontend_url`
+setting with a safe local-dev default, referenced via an f-string. Doubling
+the curly braces around Stripe's own `{CHECKOUT_SESSION_ID}` placeholder
+was required here — Stripe needs that literal text in the URL it receives,
+but a single brace inside an f-string is Python syntax for variable
+interpolation, not a literal character.
+
+**Cookie/token expiry mismatch.** The access-token cookie's `max_age` (30
+minutes) didn't match the JWT's actual `exp` (15 minutes) — for roughly 15
+minutes, a "present" cookie held an already-expired token, producing
+confusing 401s with no obvious cause. Fixed by deriving the cookie's
+`max_age` directly from the same constant used to create the token
+(`ACCESS_TOKEN_EXPIRE_SECONDS`), so the two values can't drift apart again.
+Also made the cookie `secure` flag a setting (defaulting to `False` for
+local HTTP dev) rather than hardcoded, so it can be flipped on for an
+HTTPS deployment without a code change.
+
+**GIN index for full-text search.** The Week 3 tradeoff — computing
+`to_tsvector` on the fly per search query, with no index — was closed with
+a functional GIN index (`CREATE INDEX ... USING GIN (to_tsvector('english',
+name))`) via a hand-written migration, since Alembic's `op.create_index`
+doesn't support indexing an expression directly. The query in
+`search_products` already matched the indexed expression exactly, so no
+application code change was needed beyond adding `limit`/`offset` to the
+endpoint itself.
+
+**Pydantic v2 migration.** Every schema's `class Config: from_attributes =
+True` (deprecated v1 syntax, ~235 warnings per test run) replaced with
+`model_config = ConfigDict(from_attributes=True)`; the `Settings` class
+similarly moved to `SettingsConfigDict` from `pydantic_settings` — a
+different type than plain `ConfigDict`, since it understands settings-
+specific options like `env_file`. Confirmed via `grep` on the test output
+that zero Pydantic-related warnings remained afterward; the warnings that
+remain are all from `python-jose`'s own deprecated `datetime.utcnow()`
+usage, a pre-existing, out-of-project-control issue unrelated to this fix.
+
+### Status
+
+Backend: 72 tests passing. Frontend: fully restyled, all core flows
+(auth, browsing, cart, checkout, orders, reviews) verified against the
+restyled UI. Known limitations are listed in the README rather than
+repeated here.
