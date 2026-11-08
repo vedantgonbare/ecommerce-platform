@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 import uuid
 from datetime import datetime
 from decimal import Decimal
@@ -12,6 +12,8 @@ class ProductCreate(BaseModel):
     category_id: uuid.UUID
 
 class ProductResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: uuid.UUID
     name: str
     description: str | None
@@ -20,9 +22,6 @@ class ProductResponse(BaseModel):
     stock_quantity: int
     category_id: uuid.UUID
     created_at: datetime
-
-    class Config:
-        from_attributes = True
 
 class ProductUpdate(BaseModel):
     name: str | None = None

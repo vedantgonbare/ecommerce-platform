@@ -1,6 +1,6 @@
 import uuid
 from decimal import Decimal
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class CartItemAdd(BaseModel):
@@ -13,21 +13,19 @@ class CartItemUpdate(BaseModel):
 
 
 class CartItemResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: uuid.UUID
     product_id: uuid.UUID
     product_name: str
     product_price: Decimal
     quantity: int
 
-    class Config:
-        from_attributes = True
-
 
 class CartResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: uuid.UUID
     user_id: uuid.UUID
     items: list[CartItemResponse]
     subtotal: Decimal
-
-    class Config:
-        from_attributes = True
